@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useParams } from "next/navigation";
+import { savePage, getPage as getCachedPage, clearPageHtml } from "@/lib/client-store";
 
 // ============================================================
 // HTML Auto-Close Tag Engine
@@ -79,13 +80,17 @@ function autoCloseHtml(raw: string): { safeHtml: string; closingTags: string } {
 
 function PageContent() {
   const searchParams = useSearchParams();
+  const params = useParams();
   const query = searchParams.get("q") || "";
+  const parentId = searchParams.get("parentId") || undefined;
+  const pageId = params.id as string; // Current page ID from /page/[id]
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
-  const [phase, setPhase] = useState<"streaming" | "done" | "error">("streaming");
+  const [phase, setPhase] = useState<"loading" | "streaming" | "done" | "error">("loading");
   const [progress, setProgress] = useState(0); // rough char count for progress hint
   const finalHtmlRef = useRef<string>(""); // stores the final complete HTML for export
+  const [refreshKey, setRefreshKey] = useState(0); // increment to force re-generation
 
   // Capsule state — single instance, always
   const capsuleRef = useRef<HTMLDivElement>(null);
@@ -145,11 +150,24 @@ function PageContent() {
         const doc = iframeRef.current?.contentDocument;
         if (doc?.defaultView) doc.defaultView.location.hash = href;
       } catch { /* ignore */ }
-    } else {
-      // All navigations open in a new tab to preserve the current page
+    } else if (href.startsWith("http://") || href.startsWith("https://")) {
+      // External links open in new tab as-is
       window.open(href, "_blank", "noopener,noreferrer");
+    } else {
+      // Internal links (/search?q=...) — append parentId to establish tree ancestry
+      let targetHref = href;
+      try {
+        const url = new URL(href, window.location.origin);
+        url.searchParams.set("parentId", pageId);
+        targetHref = url.pathname + url.search;
+      } catch {
+        // If URL parsing fails, just append as query param
+        const sep = href.includes("?") ? "&" : "?";
+        targetHref = `${href}${sep}parentId=${encodeURIComponent(pageId)}`;
+      }
+      window.open(targetHref, "_blank", "noopener,noreferrer");
     }
-  }, []);
+  }, [pageId]);
 
   /**
    * Given a mouse event on the overlay, find the corresponding <a> element
@@ -238,9 +256,22 @@ function PageContent() {
   useEffect(() => {
     if (!query) return;
 
+    // Check localStorage cache first (skip if refreshing)
+    if (refreshKey === 0) {
+      const cached = getCachedPage(pageId);
+      if (cached && cached.html) {
+        renderToIframe(cached.html);
+        finalHtmlRef.current = cached.html;
+        setPhase("done");
+        return;
+      }
+    }
+
+    // No cache — start streaming
+    setPhase("streaming");
+    setProgress(0);
+
     // Local flag — set to true on cleanup so the async loop stops.
-    // This is Strict-Mode safe: first mount's cleanup sets cancelled=true,
-    // the second mount starts fresh with its own cancelled=false.
     let cancelled = false;
 
     const abortController = new AbortController();
@@ -251,7 +282,7 @@ function PageContent() {
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({ query, pageId, parentId }),
           signal: abortController.signal,
         });
 
@@ -311,6 +342,18 @@ function PageContent() {
         buffer = buffer.replace(/\n?```\s*$/, "");
         renderToIframe(buffer);
         finalHtmlRef.current = buffer; // Save for export
+
+        // Persist to localStorage
+        const titleMatch = buffer.match(/<title>(.*?)<\/title>/i);
+        savePage({
+          id: pageId,
+          query,
+          html: buffer,
+          createdAt: Date.now(),
+          parentId,
+          title: titleMatch?.[1] || query,
+        });
+
         setPhase("done");
       } catch (err) {
         if (cancelled) return;
@@ -335,7 +378,8 @@ function PageContent() {
       readerRef.current?.cancel().catch(() => {});
       abortController.abort();
     };
-  }, [query, renderToIframe]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, renderToIframe, refreshKey]);
 
   // Stop generation handler
   const handleStop = useCallback(() => {
@@ -343,6 +387,20 @@ function PageContent() {
     readerRef.current?.cancel().catch(() => {});
     abortRef.current?.abort();
   }, []);
+
+  // Refresh: clear cache and re-generate the page
+  const handleRefresh = useCallback(() => {
+    // Stop any in-progress generation
+    readerRef.current?.cancel().catch(() => {});
+    abortRef.current?.abort();
+    // Clear from localStorage
+    clearPageHtml(pageId);
+    // Reset state and trigger re-generation
+    finalHtmlRef.current = "";
+    setPhase("streaming");
+    setProgress(0);
+    setRefreshKey((k) => k + 1);
+  }, [pageId]);
 
   // Export: download iframe content as HTML file
   const handleExport = useCallback(() => {
@@ -385,12 +443,16 @@ function PageContent() {
   const handleCapsuleSubmit = useCallback(() => {
     const trimmed = capsuleQuery.trim();
     if (!trimmed || trimmed === query) return;
-    // Open in new tab to preserve the current page
-    window.open(`/search?q=${encodeURIComponent(trimmed)}`, "_blank", "noopener,noreferrer");
+    // Open in new tab with parentId to maintain tree-based context
+    window.open(
+      `/search?q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
     // Collapse capsule and reset input after navigating
     setCapsuleExpanded(false);
     setCapsuleQuery(query);
-  }, [capsuleQuery, query]);
+  }, [capsuleQuery, query, pageId]);
 
   // Capsule: click input area to expand
   const handleCapsuleInputClick = useCallback(() => {
@@ -511,8 +573,8 @@ function PageContent() {
             </button>
           )}
 
-          {/* Divider + Streaming status — shown during generation */}
-          {phase === "streaming" && (
+          {/* Divider + Streaming status — shown during generation or loading */}
+          {(phase === "streaming" || phase === "loading") && (
             <>
               <div className="w-px h-4 bg-gray-200 mx-2 shrink-0" />
               <svg className="h-3.5 w-3.5 animate-spin text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none">
@@ -535,9 +597,23 @@ function PageContent() {
             </>
           )}
 
-          {/* Export button — shown when generation is complete */}
+          {/* Export & Refresh buttons — shown when generation is complete */}
           {phase === "done" && (
             <>
+              <div className="w-px h-4 bg-gray-200 mx-2 shrink-0" />
+              <button
+                onClick={handleRefresh}
+                title="重新生成此页面"
+                className="flex items-center gap-1 text-gray-400 hover:text-indigo-500 transition-colors cursor-pointer shrink-0"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4v5h5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M20 20v-5h-5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L4 9" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3.51 15A9 9 0 0 0 18.36 18.36L20 15" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-xs">刷新</span>
+              </button>
               <div className="w-px h-4 bg-gray-200 mx-2 shrink-0" />
               <button
                 onClick={handleExport}

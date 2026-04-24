@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { buildSessionTrees, clearAllPages, TreeNode } from "@/lib/client-store";
 
 const examples = [
   { text: "太阳系是什么样的？", icon: "🪐" },
@@ -15,12 +16,98 @@ function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// ============================================================
+// Tree Node Component (recursive)
+// ============================================================
+
+function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
+  const [expanded, setExpanded] = useState(depth < 2); // Auto-expand first 2 levels
+  const hasChildren = node.children.length > 0;
+  const displayTitle = node.title || node.query;
+
+  const handleClick = () => {
+    // Open the cached page in a new tab
+    const url = `/page/${node.id}?q=${encodeURIComponent(node.query)}${node.parentId ? `&parentId=${encodeURIComponent(node.parentId)}` : ""}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div className={depth > 0 ? "ml-4 border-l border-gray-100 pl-3" : ""}>
+      <div className="group flex items-start gap-2 py-1.5">
+        {/* Expand/collapse toggle */}
+        {hasChildren ? (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer"
+          >
+            <svg
+              className={`h-3 w-3 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M6.293 4.293a1 1 0 011.414 0L14 10.586l-6.293 6.293a1 1 0 01-1.414-1.414L11.172 10.5 6.293 5.414a1 1 0 010-1.414z" />
+            </svg>
+          </button>
+        ) : (
+          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+            <span className="h-1.5 w-1.5 rounded-full bg-gray-200" />
+          </span>
+        )}
+
+        {/* Node content */}
+        <button
+          onClick={handleClick}
+          className="flex-1 min-w-0 text-left cursor-pointer group/link"
+        >
+          <span className="text-sm text-gray-600 group-hover/link:text-indigo-500 transition-colors line-clamp-1">
+            {displayTitle}
+          </span>
+          {displayTitle !== node.query && (
+            <span className="text-[11px] text-gray-300 group-hover/link:text-gray-400 transition-colors line-clamp-1 mt-0.5">
+              {node.query}
+            </span>
+          )}
+        </button>
+
+        {/* Child count badge */}
+        {hasChildren && (
+          <span className="mt-0.5 shrink-0 text-[10px] text-gray-300 bg-gray-50 rounded-full px-1.5 py-0.5">
+            {node.children.length}
+          </span>
+        )}
+      </div>
+
+      {/* Children (recursive) */}
+      {expanded && hasChildren && (
+        <div>
+          {node.children.map((child) => (
+            <TreeNodeItem key={child.id} node={child} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Home Page
+// ============================================================
+
 export default function HomePage() {
   const [query, setQuery] = useState("");
   const [isNavigating, setIsNavigating] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false); // Track IME composition (Chinese input)
+  const [trees, setTrees] = useState<TreeNode[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Load session trees from localStorage
+  useEffect(() => {
+    const loaded = buildSessionTrees();
+    setTrees(loaded);
+    if (loaded.length > 0) setShowHistory(true);
+  }, []);
 
   // Auto-focus on mount
   useEffect(() => {
@@ -35,15 +122,23 @@ export default function HomePage() {
     window.location.href = `/page/${pageId}?q=${encodeURIComponent(text)}`;
   };
 
+  const handleClearHistory = useCallback(() => {
+    if (window.confirm("确定要清除所有浏览历史吗？此操作不可撤销。")) {
+      clearAllPages();
+      setTrees([]);
+      setShowHistory(false);
+    }
+  }, []);
+
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4">
+    <main className="relative flex min-h-screen flex-col items-center overflow-hidden px-4">
       {/* Subtle gradient background */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-indigo-50/50 via-white to-white" />
 
       {/* Soft glow behind the logo */}
       <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-100/30 rounded-full blur-3xl" />
 
-      <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
+      <div className={`relative z-10 flex flex-col items-center w-full max-w-2xl transition-all duration-500 ${showHistory ? "pt-16" : "justify-center min-h-screen"}`}>
         {/* Logo */}
         <div className="mb-3 flex items-center gap-3 select-none">
           <span className="text-4xl font-light text-indigo-500 leading-none" style={{ fontFamily: "serif" }}>∞</span>
@@ -135,8 +230,35 @@ export default function HomePage() {
           ))}
         </div>
 
+        {/* Session History Trees */}
+        {showHistory && trees.length > 0 && (
+          <div className="mt-12 w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-medium text-gray-400 tracking-wide flex items-center gap-2">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+                探索历史
+              </h2>
+              <button
+                onClick={handleClearHistory}
+                className="text-[11px] text-gray-300 hover:text-red-400 transition-colors cursor-pointer"
+              >
+                清除全部
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm shadow-sm p-4 max-h-[400px] overflow-y-auto">
+              {trees.map((tree) => (
+                <TreeNodeItem key={tree.id} node={tree} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Footer hint */}
-        <p className="mt-16 text-[11px] text-gray-300 tracking-wide select-none">
+        <p className="mt-16 mb-8 text-[11px] text-gray-300 tracking-wide select-none">
           内容由 AI 驱动，仅供参考
         </p>
       </div>
