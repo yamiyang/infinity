@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { savePage, getPage as getCachedPage, clearPageHtml, buildAncestryContext } from "@/lib/client-store";
 import { SelectionContext } from "@/types";
 import { isConfigured, getBasePath } from "@/lib/config";
-import { streamGeneratePage } from "@/lib/openai";
+import { streamGeneratePage, streamRevisionPage } from "@/lib/openai";
+import { RevisionComment, buildAnnotatedHtml } from "@/lib/prompt";
 
 // ============================================================
 // Incremental DOM Streaming Engine
@@ -16,8 +17,11 @@ import { streamGeneratePage } from "@/lib/openai";
  * Handles: link interception, text selection (highlight-to-ask), parent click notification.
  */
 const INTERACTION_SCRIPT = `
+  var _revisionMode = false;
+
   // Link click interception — post to parent instead of navigating
   document.addEventListener('click', function(e) {
+    if (_revisionMode) return; // Don't intercept clicks in revision mode
     var anchor = e.target.closest ? e.target.closest('a') : null;
     if (!anchor) return;
     var href = anchor.getAttribute('href');
@@ -27,6 +31,9 @@ const INTERACTION_SCRIPT = `
     window.parent.postMessage({ type: 'iframe-link-click', href: href }, '*');
   }, true);
 
+  // Store the last selection range so parent can request highlighting
+  var _lastRange = null;
+
   // Text selection listener — detect when user finishes selecting text
   var _selTimeout = null;
   document.addEventListener('mouseup', function() {
@@ -34,11 +41,14 @@ const INTERACTION_SCRIPT = `
     _selTimeout = setTimeout(function() {
       var sel = window.getSelection();
       if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+        _lastRange = null;
         window.parent.postMessage({ type: 'iframe-selection-clear' }, '*');
         return;
       }
       var selected = sel.toString().trim();
       if (selected.length < 2) return;
+
+      _lastRange = sel.getRangeAt(0).cloneRange();
 
       var range = sel.getRangeAt(0);
       var container = range.commonAncestorContainer;
@@ -65,6 +75,189 @@ const INTERACTION_SCRIPT = `
   document.addEventListener('mousedown', function() {
     clearTimeout(_selTimeout);
     window.parent.postMessage({ type: 'iframe-click' }, '*');
+  });
+
+  // Listen for highlight requests from parent
+  window.addEventListener('message', function(e) {
+    if (!e.data) return;
+
+    // Toggle revision mode in iframe
+    if (e.data.type === 'set-revision-mode') {
+      _revisionMode = !!e.data.enabled;
+      // In revision mode, prevent link navigation via CSS
+      if (_revisionMode) {
+        // Replace <a> with <inf-link> to prevent drag behavior
+        var anchors = document.querySelectorAll('a');
+        for (var li = anchors.length - 1; li >= 0; li--) {
+          var a = anchors[li];
+          var span = document.createElement('inf-link');
+          // Copy all attributes
+          for (var ai = 0; ai < a.attributes.length; ai++) {
+            span.setAttribute(a.attributes[ai].name, a.attributes[ai].value);
+          }
+          span.style.cssText = a.style.cssText;
+          span.innerHTML = a.innerHTML;
+          span.style.cursor = 'text';
+          a.parentNode.replaceChild(span, a);
+        }
+      } else {
+        // Restore <inf-link> back to <a>
+        var spans = document.querySelectorAll('inf-link');
+        for (var si = spans.length - 1; si >= 0; si--) {
+          var sp = spans[si];
+          var newA = document.createElement('a');
+          for (var bi = 0; bi < sp.attributes.length; bi++) {
+            if (sp.attributes[bi].name === 'style') continue; // drop injected style
+            newA.setAttribute(sp.attributes[bi].name, sp.attributes[bi].value);
+          }
+          newA.innerHTML = sp.innerHTML;
+          sp.parentNode.replaceChild(newA, sp);
+        }
+      }
+      return;
+    }
+
+    // Re-trigger current selection (used when entering revision mode with existing selection)
+    if (e.data.type === '__trigger-selection') {
+      var sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+      var selected = sel.toString().trim();
+      _lastRange = sel.getRangeAt(0).cloneRange();
+      var range = sel.getRangeAt(0);
+      var container = range.commonAncestorContainer;
+      while (container && container.nodeType !== 1) container = container.parentNode;
+      var fullText = container ? container.textContent || '' : '';
+      var selStart = fullText.indexOf(selected);
+      var before = '', after = '';
+      if (selStart >= 0) {
+        before = fullText.slice(Math.max(0, selStart - 100), selStart);
+        after = fullText.slice(selStart + selected.length, selStart + selected.length + 100);
+      }
+      var rect = range.getBoundingClientRect();
+      window.parent.postMessage({
+        type: 'iframe-selection',
+        selected: selected,
+        before: before,
+        after: after,
+        rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width }
+      }, '*');
+      return;
+    }
+
+    if (e.data.type !== 'highlight-selection') return;
+    var comment = e.data.comment;
+    var rcId = e.data.rcId;
+
+    if (!_lastRange) return;
+    var range = _lastRange;
+
+    // Get rects BEFORE any DOM modifications
+    var rects = range.getClientRects();
+    var selectedText = range.toString().trim();
+
+    // 1) Semantic wrap: insert <inf-comment> tags around text nodes (no style)
+    var textNodes = [];
+    var startNode = range.startContainer;
+    var endNode = range.endContainer;
+
+    if (startNode === endNode && startNode.nodeType === 3) {
+      textNodes.push({ node: startNode, start: range.startOffset, end: range.endOffset });
+    } else {
+      var tw2 = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT);
+      var inRange = false;
+      while (tw2.nextNode()) {
+        var tn = tw2.currentNode;
+        if (tn === startNode) {
+          inRange = true;
+          textNodes.push({ node: tn, start: range.startOffset, end: tn.textContent.length });
+        } else if (tn === endNode) {
+          textNodes.push({ node: tn, start: 0, end: range.endOffset });
+          break;
+        } else if (inRange) {
+          textNodes.push({ node: tn, start: 0, end: tn.textContent.length });
+        }
+      }
+    }
+
+    for (var i = textNodes.length - 1; i >= 0; i--) {
+      var info = textNodes[i];
+      var txt = info.node.textContent.slice(info.start, info.end);
+      if (!txt.trim()) continue;
+      info.node.splitText(info.end);
+      var selNode = info.node.splitText(info.start);
+      var wrapper = document.createElement('inf-comment');
+      wrapper.setAttribute('data-rc-id', rcId);
+      selNode.parentNode.replaceChild(wrapper, selNode);
+      wrapper.appendChild(selNode);
+    }
+
+    // 2) Insert an HTML comment annotation before the selection's nearest block ancestor
+    var ancestor = range.startContainer;
+    while (ancestor && ancestor.nodeType !== 1) ancestor = ancestor.parentNode;
+    // Walk up to find the nearest block-level element
+    var blockTags = ['P','DIV','H1','H2','H3','H4','H5','H6','LI','SECTION','ARTICLE','BLOCKQUOTE','TD','TH','HEADER','FOOTER','MAIN','FIGURE','FIGCAPTION'];
+    var blockEl = ancestor;
+    while (blockEl && blockEl !== document.body) {
+      if (blockEl.nodeType === 1 && blockTags.indexOf(blockEl.tagName) !== -1) break;
+      blockEl = blockEl.parentNode;
+    }
+    if (!blockEl || blockEl === document.body) blockEl = ancestor;
+
+    // Get the selected text for the annotation
+    var annotationText = '修订意见：针对「' + selectedText.slice(0, 50) + (selectedText.length > 50 ? '…' : '') + '」—— ' + comment;
+    var commentNode = document.createComment(' [REVISION id=' + rcId + '] ' + annotationText + ' ');
+    if (blockEl && blockEl.parentNode) {
+      blockEl.parentNode.insertBefore(commentNode, blockEl);
+    }
+
+    // 2) Visual overlay: absolute positioned divs for background highlight
+    for (var j = 0; j < rects.length; j++) {
+      var r = rects[j];
+      if (r.width < 1 || r.height < 1) continue;
+      var ov = document.createElement('div');
+      ov.setAttribute('data-rc-overlay', rcId);
+      ov.style.cssText = 'position:absolute;pointer-events:none;z-index:0;'
+        + 'left:' + (r.left + window.scrollX) + 'px;'
+        + 'top:' + (r.top + window.scrollY) + 'px;'
+        + 'width:' + r.width + 'px;'
+        + 'height:' + r.height + 'px;'
+        + 'background:rgba(251,191,36,0.3);border-radius:2px;';
+      document.body.appendChild(ov);
+    }
+
+    // 3) Comment bubble under the last rect (clickable to delete)
+    if (rects.length > 0) {
+      var last = rects[rects.length - 1];
+      var bubble = document.createElement('div');
+      bubble.setAttribute('data-rc-bubble', rcId);
+      bubble.style.cssText = 'position:absolute;z-index:999;cursor:pointer;'
+        + 'left:' + (last.left + window.scrollX) + 'px;'
+        + 'top:' + (last.bottom + window.scrollY + 2) + 'px;'
+        + 'display:inline-flex;align-items:center;gap:4px;'
+        + 'background:#059669;color:#fff;font-size:11px;line-height:1.2;'
+        + 'padding:2px 6px 2px 8px;border-radius:4px;font-weight:500;white-space:nowrap;'
+        + 'box-shadow:0 2px 6px rgba(0,0,0,0.15);';
+
+      var textSpan = document.createElement('span');
+      textSpan.textContent = comment;
+      bubble.appendChild(textSpan);
+
+      var closeBtn = document.createElement('span');
+      closeBtn.textContent = '✕';
+      closeBtn.style.cssText = 'opacity:0.6;font-size:10px;padding:0 2px;margin-left:2px;';
+      closeBtn.onmouseenter = function() { closeBtn.style.opacity = '1'; };
+      closeBtn.onmouseleave = function() { closeBtn.style.opacity = '0.6'; };
+      bubble.appendChild(closeBtn);
+
+      bubble.onclick = function() {
+        window.parent.postMessage({ type: 'iframe-delete-comment', rcId: rcId }, '*');
+      };
+      document.body.appendChild(bubble);
+    }
+
+    var sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    _lastRange = null;
   });
 `;
 
@@ -233,6 +426,19 @@ function PageContent() {
   const [capsuleQuery, setCapsuleQuery] = useState(query);
   const isComposingRef = useRef(false);
 
+  // Revision mode state
+  const [revisionMode, setRevisionMode] = useState(false);
+  const [revisionComments, setRevisionComments] = useState<RevisionComment[]>([]);
+  const [revisionInput, setRevisionInput] = useState("");
+  const [revisionPrompt, setRevisionPrompt] = useState(""); // additional instruction for revision
+
+  // Notify iframe when revision mode changes
+  useEffect(() => {
+    try {
+      iframeRef.current?.contentWindow?.postMessage({ type: "set-revision-mode", enabled: revisionMode }, "*");
+    } catch { /* ignore */ }
+  }, [revisionMode]);
+
   /** Get or create the incremental writer for the current iframe */
   const getWriter = useCallback(() => {
     if (!iframeRef.current) return null;
@@ -318,6 +524,8 @@ function PageContent() {
       if (!e.data || typeof e.data.type !== "string") return;
 
       if (e.data.type === "iframe-link-click") {
+        // In revision mode, suppress link navigation
+        if (revisionMode) return;
         const href = e.data.href as string;
         if (!href) return;
         navigateToHref(href);
@@ -339,8 +547,13 @@ function PageContent() {
           left: iframeRect.left + r.left + r.width / 2,
           width: r.width,
         });
-        setSelectionQuery("");
-        // Auto-focus the input after render
+
+        if (revisionMode) {
+          // In revision mode, prepare for adding a comment
+          setRevisionInput("");
+        } else {
+          setSelectionQuery("");
+        }
         setTimeout(() => selectionInputRef.current?.focus(), 100);
       }
 
@@ -361,11 +574,40 @@ function PageContent() {
           setSelectionRect(null);
         }
       }
+
+      if (e.data.type === "iframe-delete-comment") {
+        const rcId = e.data.rcId as string;
+        if (rcId) {
+          setRevisionComments((prev) => prev.filter((c) => c.id !== rcId));
+          try {
+            const doc = iframeRef.current?.contentDocument;
+            if (doc) {
+              doc.querySelectorAll(`[data-rc-overlay="${rcId}"]`).forEach((el) => el.remove());
+              doc.querySelectorAll(`[data-rc-bubble="${rcId}"]`).forEach((el) => el.remove());
+              doc.querySelectorAll(`inf-comment[data-rc-id="${rcId}"]`).forEach((el) => {
+                const parent = el.parentNode;
+                if (parent) {
+                  while (el.firstChild) parent.insertBefore(el.firstChild, el);
+                  parent.removeChild(el);
+                  parent.normalize();
+                }
+              });
+              const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT);
+              const toRemove: Comment[] = [];
+              while (walker.nextNode()) {
+                const node = walker.currentNode as Comment;
+                if (node.textContent?.includes(`[REVISION id=${rcId}]`)) toRemove.push(node);
+              }
+              toRemove.forEach((n) => n.remove());
+            }
+          } catch { /* ignore */ }
+        }
+      }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [navigateToHref, query]);
+  }, [navigateToHref, query, revisionMode]);
 
   // Close selection panel when clicking outside
   useEffect(() => {
@@ -402,6 +644,218 @@ function PageContent() {
     setSelectionRect(null);
     setSelectionQuery("");
   }, [selectionQuery, selectionCtx, pageId]);
+
+  // Add a revision comment (revision mode)
+  const handleAddRevisionComment = useCallback(() => {
+    const trimmed = revisionInput.trim();
+    if (!trimmed || !selectionCtx) return;
+
+    const newComment: RevisionComment = {
+      id: `rc-${Date.now().toString(36)}`,
+      selected: selectionCtx.selected,
+      comment: trimmed,
+      before: selectionCtx.before,
+      after: selectionCtx.after,
+    };
+    setRevisionComments((prev) => [...prev, newComment]);
+
+    // Tell iframe to highlight using the saved range
+    try {
+      iframeRef.current?.contentWindow?.postMessage({
+        type: "highlight-selection",
+        comment: trimmed,
+        rcId: newComment.id,
+      }, "*");
+    } catch { /* ignore */ }
+
+    setSelectionCtx(null);
+    setSelectionRect(null);
+    setRevisionInput("");
+  }, [revisionInput, selectionCtx]);
+
+  // Remove a revision comment + its highlight in iframe
+  const handleRemoveComment = useCallback((id: string) => {
+    setRevisionComments((prev) => prev.filter((c) => c.id !== id));
+    try {
+      const doc = iframeRef.current?.contentDocument;
+      if (doc) {
+        doc.querySelectorAll(`[data-rc-overlay="${id}"]`).forEach((el) => el.remove());
+        doc.querySelectorAll(`[data-rc-bubble="${id}"]`).forEach((el) => el.remove());
+        // Unwrap inf-comment elements
+        doc.querySelectorAll(`inf-comment[data-rc-id="${id}"]`).forEach((el) => {
+          const parent = el.parentNode;
+          if (parent) {
+            while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            parent.removeChild(el);
+            parent.normalize();
+          }
+        });
+        // Remove HTML comment nodes
+        const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT);
+        const toRemove: Comment[] = [];
+        while (walker.nextNode()) {
+          const node = walker.currentNode as Comment;
+          if (node.textContent?.includes(`[REVISION id=${id}]`)) {
+            toRemove.push(node);
+          }
+        }
+        toRemove.forEach((n) => n.remove());
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Apply revision — re-generate with comments
+  // Revision: store annotated HTML in ref, trigger via key
+  const revisionHtmlRef = useRef<string>("");
+  const [revisionKey, setRevisionKey] = useState(0);
+
+  const handleApplyRevision = useCallback(() => {
+    if (revisionComments.length === 0 && !revisionPrompt.trim()) return;
+
+    // Get live HTML from iframe (contains <!-- [REVISION] --> comment nodes)
+    let annotatedHtml = "";
+    try {
+      const doc = iframeRef.current?.contentDocument;
+      if (doc?.documentElement) {
+        const clone = doc.documentElement.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll("[data-rc-overlay]").forEach((el) => el.remove());
+        clone.querySelectorAll("[data-rc-bubble]").forEach((el) => el.remove());
+        // Remove injected interaction scripts (keep Tailwind CDN <script>)
+        clone.querySelectorAll("script").forEach((el) => {
+          const src = el.getAttribute("src") || "";
+          if (!src.includes("tailwindcss")) el.remove();
+        });
+        // Remove Tailwind-generated runtime styles (huge) but keep author <style> tags (short)
+        clone.querySelectorAll("style").forEach((el) => {
+          const text = el.textContent || "";
+          // Tailwind CDN injects styles with thousands of rules; author styles are < 20 lines
+          if (text.length > 2000 || text.includes("padding-bottom:60px")) el.remove();
+        });
+        clone.querySelectorAll("inf-comment").forEach((el) => {
+          const parent = el.parentNode;
+          if (parent) {
+            while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            parent.removeChild(el);
+          }
+        });
+        // Restore inf-link back to <a> in clone
+        clone.querySelectorAll("inf-link").forEach((el) => {
+          const a = document.createElement("a");
+          for (let i = 0; i < el.attributes.length; i++) {
+            a.setAttribute(el.attributes[i].name, el.attributes[i].value);
+          }
+          a.innerHTML = el.innerHTML;
+          el.parentNode?.replaceChild(a, el);
+        });
+        annotatedHtml = "<!DOCTYPE html>\n" + clone.outerHTML;
+      }
+    } catch { /* ignore */ }
+
+    if (!annotatedHtml) {
+      annotatedHtml = buildAnnotatedHtml(finalHtmlRef.current, revisionComments);
+    }
+
+    revisionHtmlRef.current = annotatedHtml;
+    setRevisionMode(false);
+    setRevisionKey((k) => k + 1);
+  }, [revisionComments, revisionPrompt]);
+
+  // Revision generation effect — triggered by revisionKey
+  useEffect(() => {
+    if (revisionKey === 0) return;
+    const annotatedHtml = revisionHtmlRef.current;
+    if (!annotatedHtml) return;
+
+    abortRef.current?.abort();
+    const writer = getWriter();
+    writer?.reset();
+    setPhase("streaming");
+    setProgress(0);
+
+    let cancelled = false;
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+
+    const revise = async () => {
+      try {
+        const contextHistory = buildAncestryContext(parentId);
+        let buffer = "";
+        let rafId: number | null = null;
+        let needsRender = false;
+
+        const scheduleRender = () => {
+          needsRender = true;
+          if (rafId !== null) return;
+          rafId = requestAnimationFrame(() => {
+            rafId = null;
+            if (!needsRender || cancelled) return;
+            needsRender = false;
+            writer?.update(buffer);
+            setProgress(buffer.length);
+          });
+        };
+
+        const fullHtml = await streamRevisionPage(
+          annotatedHtml,
+          contextHistory,
+          revisionPrompt.trim(),
+          (token: string) => {
+            if (cancelled || abortController.signal.aborted) return;
+            buffer += token;
+            scheduleRender();
+          },
+          abortController.signal
+        );
+
+        if (cancelled) return;
+        if (rafId !== null) cancelAnimationFrame(rafId);
+
+        writer?.finalize(fullHtml);
+        finalHtmlRef.current = fullHtml;
+
+        let summary = "";
+        const metaMatch = fullHtml.match(/<meta\s+name=["']page-summary["']\s+content=["']([^"']*)["']/i);
+        summary = metaMatch?.[1] || "";
+
+        const titleMatch = fullHtml.match(/<title>(.*?)<\/title>/i);
+        const linkMatches = [...fullHtml.matchAll(/data-q="([^"]*)"/g)];
+        const links = linkMatches.map((m) => m[1]).slice(0, 15);
+
+        savePage({
+          id: pageId,
+          query,
+          html: fullHtml,
+          createdAt: Date.now(),
+          parentId,
+          title: titleMatch?.[1] || query,
+          links,
+          summary,
+        });
+
+        setRevisionComments([]);
+        setRevisionPrompt("");
+        setPhase("done");
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setPhase("done");
+          return;
+        }
+        console.error(err);
+        setPhase("error");
+      } finally {
+        abortRef.current = null;
+      }
+    };
+
+    revise();
+
+    return () => {
+      cancelled = true;
+      abortController.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revisionKey]);
 
   // Quick-action shortcuts for selection popup
   const selectionShortcuts = [
@@ -682,49 +1136,103 @@ function PageContent() {
               </span>
             </div>
 
-            {/* Quick-action shortcut chips */}
-            <div className="flex flex-wrap gap-1.5 mb-2.5">
-              {selectionShortcuts.map((s) => (
-                <button
-                  key={s.label}
-                  onClick={() => handleSelectionSubmit(s.query)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white/70 backdrop-blur-sm border border-gray-200/60 text-gray-600 hover:bg-indigo-50/80 hover:text-indigo-600 hover:border-indigo-200/60 transition-all active:scale-95 cursor-pointer"
-                >
-                  <span>{s.icon}</span>
-                  <span>{s.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Custom input row */}
-            <div className="flex items-center gap-2">
-              <input
-                ref={selectionInputRef}
-                type="text"
-                value={selectionQuery}
-                onChange={(e) => setSelectionQuery(e.target.value)}
-                onCompositionStart={() => { isComposingRef.current = true; }}
-                onCompositionEnd={() => { isComposingRef.current = false; }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isComposingRef.current) handleSelectionSubmit();
-                  if (e.key === "Escape") {
-                    setSelectionCtx(null);
-                    setSelectionRect(null);
-                  }
-                }}
-                placeholder="或输入自定义问题..."
-                className="flex-1 bg-white/50 backdrop-blur-sm rounded-xl px-3 py-2 text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-300/40 border border-white/60 min-w-0"
-              />
-              <button
-                onClick={() => handleSelectionSubmit()}
-                disabled={!selectionQuery.trim()}
-                className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-indigo-500/90 backdrop-blur-sm text-white transition-all hover:bg-indigo-600 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
+            {revisionMode ? (
+              /* ── Revision mode: comment input + existing comments ── */
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={selectionInputRef}
+                    type="text"
+                    value={revisionInput}
+                    onChange={(e) => setRevisionInput(e.target.value)}
+                    onCompositionStart={() => { isComposingRef.current = true; }}
+                    onCompositionEnd={() => { isComposingRef.current = false; }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !isComposingRef.current) handleAddRevisionComment();
+                      if (e.key === "Escape") {
+                        setSelectionCtx(null);
+                        setSelectionRect(null);
+                      }
+                    }}
+                    placeholder="输入修订意见..."
+                    className="flex-1 bg-amber-50/80 backdrop-blur-sm rounded-xl px-3 py-2 text-sm text-gray-800 placeholder-amber-400/70 outline-none focus:ring-2 focus:ring-amber-300/40 border border-amber-200/60 min-w-0"
+                  />
+                  <button
+                    onClick={handleAddRevisionComment}
+                    disabled={!revisionInput.trim()}
+                    className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-amber-500/90 backdrop-blur-sm text-white transition-all hover:bg-amber-600 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+                {revisionComments.length > 0 && (
+                  <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                    {revisionComments.map((c) => (
+                      <div key={c.id} className="flex items-center gap-1.5 bg-emerald-600 rounded-lg px-2.5 py-1.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] text-emerald-200 truncate">&ldquo;{c.selected.length > 20 ? c.selected.slice(0, 20) + "…" : c.selected}&rdquo;</div>
+                          <div className="text-xs text-white font-medium truncate">{c.comment}</div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveComment(c.id)}
+                          className="shrink-0 h-4 w-4 flex items-center justify-center rounded text-emerald-300 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Normal mode: explore shortcuts + custom input ── */
+              <>
+                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {selectionShortcuts.map((s) => (
+                    <button
+                      key={s.label}
+                      onClick={() => handleSelectionSubmit(s.query)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white/70 backdrop-blur-sm border border-gray-200/60 text-gray-600 hover:bg-indigo-50/80 hover:text-indigo-600 hover:border-indigo-200/60 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <span>{s.icon}</span>
+                      <span>{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={selectionInputRef}
+                    type="text"
+                    value={selectionQuery}
+                    onChange={(e) => setSelectionQuery(e.target.value)}
+                    onCompositionStart={() => { isComposingRef.current = true; }}
+                    onCompositionEnd={() => { isComposingRef.current = false; }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !isComposingRef.current) handleSelectionSubmit();
+                      if (e.key === "Escape") {
+                        setSelectionCtx(null);
+                        setSelectionRect(null);
+                      }
+                    }}
+                    placeholder="或输入自定义问题..."
+                    className="flex-1 bg-white/50 backdrop-blur-sm rounded-xl px-3 py-2 text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-300/40 border border-white/60 min-w-0"
+                  />
+                  <button
+                    onClick={() => handleSelectionSubmit()}
+                    disabled={!selectionQuery.trim()}
+                    className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-indigo-500/90 backdrop-blur-sm text-white transition-all hover:bg-indigo-600 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -739,7 +1247,7 @@ function PageContent() {
           className={`
             flex items-center bg-white/90 backdrop-blur-2xl backdrop-saturate-150 rounded-full border border-gray-200/80 shadow-[0_8px_40px_rgba(0,0,0,0.08),0_1.5px_6px_rgba(0,0,0,0.05)]
             transition-all duration-300 ease-in-out overflow-hidden
-            ${capsuleExpanded ? "w-[560px] px-5 py-3" : "w-auto max-w-[320px] px-3 py-2"}
+            ${(capsuleExpanded || revisionMode) ? "w-[560px] px-5 py-3" : "w-auto max-w-[320px] px-3 py-2"}
           `}
         >
           {/* Home button */}
@@ -752,14 +1260,30 @@ function PageContent() {
           </a>
           <div className="w-px h-4 bg-gray-200 mx-1 shrink-0" />
 
-          {/* Search icon */}
-          <svg className={`${capsuleExpanded ? "h-5 w-5" : "h-3.5 w-3.5"} text-gray-600 shrink-0 transition-all`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-          </svg>
+          {/* Search icon (normal mode) / Edit icon (revision mode) */}
+          {!revisionMode && (
+            <svg className={`${capsuleExpanded ? "h-5 w-5" : "h-3.5 w-3.5"} text-gray-600 shrink-0 transition-all`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+            </svg>
+          )}
 
           {/* Input area */}
-          {capsuleExpanded ? (
+          {revisionMode ? (
+            /* Revision prompt input — always expanded */
+            <input
+              type="text"
+              value={revisionPrompt}
+              onChange={(e) => setRevisionPrompt(e.target.value)}
+              onCompositionStart={() => { isComposingRef.current = true; }}
+              onCompositionEnd={() => { isComposingRef.current = false; }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isComposingRef.current && (revisionComments.length > 0 || revisionPrompt.trim())) handleApplyRevision();
+              }}
+              placeholder="可选：输入额外修订要求..."
+              className="flex-1 bg-transparent px-3 py-1 text-base text-gray-900 placeholder-gray-400 outline-none min-w-0"
+            />
+          ) : capsuleExpanded ? (
             <input
               ref={capsuleInputRef}
               type="text"
@@ -786,8 +1310,8 @@ function PageContent() {
             </span>
           )}
 
-          {/* Submit button */}
-          {capsuleExpanded && (
+          {/* Submit button (normal mode only) */}
+          {capsuleExpanded && !revisionMode && (
             <button
               onClick={handleCapsuleSubmit}
               disabled={!capsuleQuery.trim() || capsuleQuery.trim() === query}
@@ -823,9 +1347,32 @@ function PageContent() {
             </>
           )}
 
-          {/* Export & Refresh buttons */}
-          {phase === "done" && (
+          {/* Export & Refresh & Revision buttons */}
+          {phase === "done" && !revisionMode && (
             <>
+              <div className="w-px h-4 bg-gray-300 mx-2 shrink-0" />
+              <button
+                onClick={() => {
+                  setRevisionMode(true);
+                  setCapsuleExpanded(false);
+                  // If text is already selected in iframe, trigger revision popup
+                  try {
+                    const sel = iframeRef.current?.contentWindow?.getSelection();
+                    if (sel && !sel.isCollapsed && sel.toString().trim().length >= 2) {
+                      // Re-trigger selection event from iframe
+                      iframeRef.current?.contentWindow?.postMessage({ type: '__trigger-selection' }, '*');
+                    }
+                  } catch { /* ignore */ }
+                }}
+                title="修订模式"
+                className="flex items-center gap-1 text-gray-500 hover:text-amber-500 transition-colors cursor-pointer shrink-0"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-xs font-medium">修订</span>
+              </button>
               <div className="w-px h-4 bg-gray-300 mx-2 shrink-0" />
               <button
                 onClick={handleRefresh}
@@ -851,6 +1398,48 @@ function PageContent() {
                   <path d="M4 21h16" strokeLinecap="round" />
                 </svg>
                 <span className="text-xs font-medium">保存</span>
+              </button>
+            </>
+          )}
+
+          {/* Revision mode capsule controls */}
+          {phase === "done" && revisionMode && (
+            <>
+              <div className="w-px h-4 bg-gray-300 mx-2 shrink-0" />
+              <span className="text-xs text-amber-600 font-medium shrink-0 flex items-center gap-1">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                修订中
+                {revisionComments.length > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold leading-none">
+                    {revisionComments.length}
+                  </span>
+                )}
+              </span>
+              <div className="w-px h-4 bg-gray-300 mx-2 shrink-0" />
+              <button
+                onClick={handleApplyRevision}
+                disabled={revisionComments.length === 0 && !revisionPrompt.trim()}
+                title="应用修订并重新生成"
+                className="flex items-center gap-1 text-amber-600 hover:text-amber-700 transition-colors cursor-pointer shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-xs font-medium">应用</span>
+              </button>
+              <div className="w-px h-4 bg-gray-300 mx-2 shrink-0" />
+              <button
+                onClick={() => { setRevisionMode(false); setRevisionComments([]); setRevisionPrompt(""); }}
+                title="退出修订模式"
+                className="flex items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer shrink-0"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-xs font-medium">取消</span>
               </button>
             </>
           )}

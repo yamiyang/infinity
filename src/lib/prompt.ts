@@ -229,3 +229,161 @@ export function buildUserPrompt(
 
   return parts.join("\n");
 }
+
+// ============================================================
+// Revision mode
+// ============================================================
+
+export const REVISION_SYSTEM_PROMPT = `You revise HTML pages based on user feedback. Output ONLY raw HTML starting with <!DOCTYPE html>. NO explanation, NO markdown fences, NO preamble.
+
+User annotations appear as HTML comments before the relevant element:
+<!-- [REVISION id=xxx] 修订意见：针对「text」—— feedback -->
+
+Apply ALL revision comments. Keep the page structure, style, links, and language. Update <meta name="page-summary">. Remove all revision annotations from output. NO entry animations.
+
+START YOUR RESPONSE WITH <!DOCTYPE html> IMMEDIATELY.`;
+
+export interface RevisionComment {
+  id: string;
+  selected: string;       // exact selected text
+  comment: string;        // user's comment/feedback
+  before: string;         // text before selection for locating
+  after: string;          // text after selection for locating
+}
+
+/**
+ * Build the annotated HTML for revision mode.
+ *
+ * Strategy:
+ * 1. If selected text exists verbatim in the HTML source → wrap with a single <revision-comment>
+ * 2. If it spans tags → strip tags from HTML to build a text-to-position map,
+ *    locate the selection in the text layer, then wrap each text fragment
+ *    with <revision-comment data-group="GID" data-comment="...">
+ *    The AI sees the same group id and understands these fragments form one selection.
+ */
+export function buildAnnotatedHtml(html: string, comments: RevisionComment[]): string {
+  let result = html;
+
+  // Process each comment (reverse order by text position to avoid offset drift)
+  // We work on `result` which mutates, so we re-locate each time
+  for (const c of [...comments].reverse()) {
+    const escaped = c.comment.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    // Fast path: direct match in HTML source
+    const directIdx = result.indexOf(c.selected);
+    if (directIdx !== -1) {
+      const tag = `<revision-comment data-comment="${escaped}">`;
+      result = result.slice(0, directIdx) + tag + c.selected + "</revision-comment>" + result.slice(directIdx + c.selected.length);
+      continue;
+    }
+
+    // Cross-tag path: build char map from HTML positions to text-layer positions
+    const textChars: string[] = [];
+    const htmlToText: number[] = [];
+    let inTag = false;
+    for (let i = 0; i < result.length; i++) {
+      if (result[i] === "<") { inTag = true; htmlToText.push(-1); continue; }
+      if (result[i] === ">") { inTag = false; htmlToText.push(-1); continue; }
+      if (inTag) { htmlToText.push(-1); continue; }
+      htmlToText.push(textChars.length);
+      textChars.push(result[i]);
+    }
+
+    const fullText = textChars.join("");
+
+    // Normalize: collapse whitespace to single space, trim
+    const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
+    const normSelected = normalize(c.selected);
+    const normFull = normalize(fullText);
+
+    const normIdx = normFull.indexOf(normSelected);
+    if (normIdx === -1) continue;
+
+    // Build normPos -> origTextPos mapping
+    const normToOrig: number[] = [];
+    let prevWasSpace = false;
+    let leading = true;
+    for (let oi = 0; oi < fullText.length; oi++) {
+      const ch = fullText[oi];
+      if (/\s/.test(ch)) {
+        if (leading) continue;
+        if (!prevWasSpace) {
+          normToOrig.push(oi);
+          prevWasSpace = true;
+        }
+      } else {
+        leading = false;
+        normToOrig.push(oi);
+        prevWasSpace = false;
+      }
+    }
+
+    const selTextStart = normToOrig[normIdx];
+    const normEndIdx = normIdx + normSelected.length - 1;
+    if (selTextStart === undefined || normEndIdx >= normToOrig.length) continue;
+    const selTextEnd = normToOrig[normEndIdx] + 1;
+
+    // Collect HTML position segments where textOffset is in [selTextStart, selTextEnd)
+    type Seg = { s: number; e: number };
+    const segments: Seg[] = [];
+    let segS = -1;
+
+    for (let i = 0; i < htmlToText.length; i++) {
+      const t = htmlToText[i];
+      if (t !== -1 && t >= selTextStart && t < selTextEnd) {
+        if (segS === -1) segS = i;
+      } else {
+        if (segS !== -1) {
+          segments.push({ s: segS, e: i });
+          segS = -1;
+        }
+      }
+    }
+    if (segS !== -1) segments.push({ s: segS, e: htmlToText.length });
+
+    // Filter out segments that are pure whitespace
+    const contentSegments = segments.filter(seg => result.slice(seg.s, seg.e).trim().length > 0);
+
+    if (contentSegments.length === 0) continue;
+
+    const groupId = c.id;
+
+    // Wrap segments in reverse order
+    for (let i = contentSegments.length - 1; i >= 0; i--) {
+      const seg = contentSegments[i];
+      const fragment = result.slice(seg.s, seg.e);
+      const tag = i === 0
+        ? `<revision-comment data-group="${groupId}" data-comment="${escaped}">`
+        : `<revision-comment data-group="${groupId}">`;
+      result = result.slice(0, seg.s) + tag + fragment + "</revision-comment>" + result.slice(seg.e);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Build user prompt for revision mode.
+ */
+export function buildRevisionPrompt(annotatedHtml: string, history: HistoryItem[], extraPrompt?: string): string {
+  const parts: string[] = [];
+
+  if (history.length > 0) {
+    parts.push("## Page context (exploration history):");
+    history.forEach((item, i) => {
+      parts.push(`Page ${i + 1}: "${item.query}" — ${item.summary || item.title}`);
+    });
+    parts.push("");
+  }
+
+  if (extraPrompt) {
+    parts.push("## Additional revision instructions from user:");
+    parts.push(extraPrompt);
+    parts.push("");
+  }
+
+  parts.push("## Page to revise (with revision annotations in HTML comments):\n");
+  parts.push(annotatedHtml);
+
+  return parts.join("\n");
+}
