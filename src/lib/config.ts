@@ -1,5 +1,7 @@
 "use client";
 
+import { isElectron } from "./env";
+
 const CONFIG_KEY = "infinity_config";
 
 export interface AppConfig {
@@ -118,7 +120,11 @@ export function getPreset(id: string): ModelPreset | undefined {
   return MODEL_PRESETS.find((p) => p.id === id);
 }
 
-export function getConfig(): AppConfig {
+// ============================================================
+// Web mode: localStorage-based config (unchanged behavior)
+// ============================================================
+
+function getLocalConfig(): AppConfig {
   if (typeof window === "undefined") return DEFAULT_CONFIG;
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
@@ -129,15 +135,94 @@ export function getConfig(): AppConfig {
   }
 }
 
-export function saveConfig(config: Partial<AppConfig>): void {
+function saveLocalConfig(config: Partial<AppConfig>): void {
   if (typeof window === "undefined") return;
-  const current = getConfig();
+  const current = getLocalConfig();
   const merged = { ...current, ...config };
   localStorage.setItem(CONFIG_KEY, JSON.stringify(merged));
 }
 
+// ============================================================
+// Electron mode: server-backed config via API
+// ============================================================
+
+// In-memory cache for electron config (to avoid blocking reads)
+let _electronConfigCache: AppConfig | null = null;
+let _electronConfigLoaded = false;
+
+/** Fetch full config from backend (Electron mode) */
+export async function fetchElectronConfig(): Promise<AppConfig> {
+  try {
+    const res = await fetch("/api/config?action=full");
+    const data = await res.json();
+    const cfg = { ...DEFAULT_CONFIG, ...data };
+    _electronConfigCache = cfg;
+    _electronConfigLoaded = true;
+    return cfg;
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+/** Save config to backend (Electron mode) */
+export async function saveElectronConfig(config: Partial<AppConfig>): Promise<void> {
+  try {
+    const current = _electronConfigCache || DEFAULT_CONFIG;
+    const merged = { ...current, ...config };
+    await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(merged),
+    });
+    _electronConfigCache = merged;
+  } catch {
+    // ignore
+  }
+}
+
+/** Check if electron has API key configured (uses cached safe config) */
+export async function isElectronConfigured(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/config");
+    const data = await res.json();
+    return !!data.hasApiKey;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================
+// Unified interface (auto-detect mode)
+// ============================================================
+
+/** Get config synchronously — works for both modes.
+ *  In Electron mode, returns cached config (call fetchElectronConfig first).
+ */
+export function getConfig(): AppConfig {
+  if (isElectron()) {
+    return _electronConfigCache || DEFAULT_CONFIG;
+  }
+  return getLocalConfig();
+}
+
+/** Save config — auto-detects mode */
+export function saveConfig(config: Partial<AppConfig>): void {
+  if (isElectron()) {
+    // Fire and forget async save
+    saveElectronConfig(config);
+  } else {
+    saveLocalConfig(config);
+  }
+}
+
+/** Check if configured — synchronous check for web, may need async for electron */
 export function isConfigured(): boolean {
-  const config = getConfig();
+  if (isElectron()) {
+    // Use cached value
+    if (_electronConfigCache) return !!_electronConfigCache.openaiApiKey;
+    return _electronConfigLoaded ? false : true; // Assume configured until loaded
+  }
+  const config = getLocalConfig();
   return !!config.openaiApiKey;
 }
 

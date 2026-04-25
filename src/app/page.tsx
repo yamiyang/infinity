@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { buildSessionTrees, clearAllPages, TreeNode } from "@/lib/client-store";
-import { isConfigured, getBasePath } from "@/lib/config";
+import { isConfigured, getBasePath, fetchElectronConfig, isElectronConfigured } from "@/lib/config";
+import { isElectron } from "@/lib/env";
 import SettingsModal from "@/components/SettingsModal";
 
 const examples = [
@@ -106,13 +107,25 @@ export default function HomePage() {
     const loaded = buildSessionTrees();
     setTrees(loaded);
     if (loaded.length > 0) setShowHistory(true);
-    setConfigured(isConfigured());
+
+    // Check config — async for Electron mode
+    if (isElectron()) {
+      fetchElectronConfig().then(() => {
+        isElectronConfigured().then(setConfigured);
+      });
+    } else {
+      setConfigured(isConfigured());
+    }
   }, []);
 
   // Re-check config when settings modal closes
   useEffect(() => {
     if (!settingsOpen) {
-      setConfigured(isConfigured());
+      if (isElectron()) {
+        isElectronConfigured().then(setConfigured);
+      } else {
+        setConfigured(isConfigured());
+      }
     }
   }, [settingsOpen]);
 
@@ -121,11 +134,19 @@ export default function HomePage() {
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = (q?: string) => {
+  const handleSubmit = async (q?: string) => {
     const text = (q || query).trim();
     if (!text || isNavigating) return;
 
-    if (!isConfigured()) {
+    // Check config — async for Electron
+    let ready = false;
+    if (isElectron()) {
+      ready = await isElectronConfigured();
+    } else {
+      ready = isConfigured();
+    }
+
+    if (!ready) {
       setSettingsOpen(true);
       return;
     }
@@ -296,7 +317,7 @@ export default function HomePage() {
 
         {/* Footer hint */}
         <p className="mt-16 mb-8 text-[11px] text-gray-300 tracking-wide select-none">
-          Powered by AI · Runs entirely in your browser
+          {isElectron() ? "Powered by AI · Desktop Edition" : "Powered by AI · Runs entirely in your browser"}
         </p>
       </div>
 

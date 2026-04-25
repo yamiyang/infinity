@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getConfig, saveConfig, AppConfig, MODEL_PRESETS, getPreset } from "@/lib/config";
+import { getConfig, saveConfig, AppConfig, MODEL_PRESETS, getPreset, fetchElectronConfig, saveElectronConfig } from "@/lib/config";
+import { isElectron } from "@/lib/env";
 
 type SettingsTab = "llm" | "image";
 
@@ -20,13 +21,24 @@ const LINK_ICON = (
 export default function SettingsModal({ open, onClose, initialTab }: SettingsModalProps) {
   const [config, setConfig] = useState<AppConfig>(getConfig());
   const [tab, setTab] = useState<SettingsTab>(initialTab || "llm");
+  const [loading, setLoading] = useState(false);
+  const electronMode = isElectron();
 
   useEffect(() => {
     if (open) {
-      setConfig(getConfig());
       if (initialTab) setTab(initialTab);
+      if (electronMode) {
+        // Fetch full config from backend (includes API keys)
+        setLoading(true);
+        fetchElectronConfig().then((cfg) => {
+          setConfig(cfg);
+          setLoading(false);
+        });
+      } else {
+        setConfig(getConfig());
+      }
     }
-  }, [open, initialTab]);
+  }, [open, initialTab, electronMode]);
 
   const isCustom = config.provider === "custom";
   const currentPreset = !isCustom ? getPreset(config.provider) : undefined;
@@ -47,8 +59,12 @@ export default function SettingsModal({ open, onClose, initialTab }: SettingsMod
     setConfig({ ...config, provider: "custom" });
   };
 
-  const handleSave = () => {
-    saveConfig(config);
+  const handleSave = async () => {
+    if (electronMode) {
+      await saveElectronConfig(config);
+    } else {
+      saveConfig(config);
+    }
     onClose();
   };
 
@@ -100,9 +116,21 @@ export default function SettingsModal({ open, onClose, initialTab }: SettingsMod
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-          {tab === "llm" ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-6 w-6 border-2 border-gray-200 border-t-indigo-500 rounded-full animate-spin" />
+            </div>
+          ) : tab === "llm" ? (
             /* ── LLM Tab ── */
             <>
+              {/* Electron mode badge */}
+              {electronMode && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50/80 border border-indigo-100">
+                  <span className="text-xs text-indigo-600 font-medium">Desktop Mode</span>
+                  <span className="text-[10px] text-indigo-400">Keys stored securely on your device</span>
+                </div>
+              )}
+
               {/* Provider Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2.5">Model Provider</label>
@@ -164,7 +192,12 @@ export default function SettingsModal({ open, onClose, initialTab }: SettingsMod
                     </a>
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs text-gray-400">Your key is stored locally in the browser only. Never sent to any third party.</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {electronMode
+                      ? "Your key is stored locally on your device. Never sent to any third party."
+                      : "Your key is stored locally in the browser only. Never sent to any third party."
+                    }
+                  </p>
                 )}
               </div>
 
@@ -299,7 +332,9 @@ export default function SettingsModal({ open, onClose, initialTab }: SettingsMod
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-          <p className="text-[10px] text-gray-400">All keys stored locally only.</p>
+          <p className="text-[10px] text-gray-400">
+            {electronMode ? "Keys stored securely on device." : "All keys stored locally only."}
+          </p>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}

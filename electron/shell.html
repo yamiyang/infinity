@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinity</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --tab-height: 38px;
+      --titlebar-height: 38px;
+      --bg: #f8f9fa;
+      --tab-hover: #f0f0f0;
+      --tab-active: #ffffff;
+      --border: #e5e7eb;
+      --text: #374151;
+      --text-muted: #9ca3af;
+      --accent: #6366f1;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      user-select: none;
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: center;
+      height: var(--titlebar-height);
+      background: var(--bg);
+      -webkit-app-region: drag;
+      padding: 0 8px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .titlebar-spacer { width: 68px; flex-shrink: 0; }
+
+    .tab-bar {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      overflow-x: auto;
+      gap: 1px;
+      -webkit-app-region: no-drag;
+      padding: 4px 0;
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      height: 30px;
+      padding: 0 10px 0 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 12px;
+      color: var(--text-muted);
+      max-width: 200px;
+      min-width: 80px;
+      flex-shrink: 0;
+      position: relative;
+      gap: 6px;
+      background: transparent;
+    }
+    .tab:hover { background: var(--tab-hover); color: var(--text); }
+    .tab.active {
+      background: var(--tab-active);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      font-weight: 500;
+    }
+    .tab-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tab-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.15s;
+      flex-shrink: 0;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .tab:hover .tab-close, .tab.active .tab-close { opacity: 0.6; }
+    .tab-close:hover { opacity: 1 !important; background: rgba(0,0,0,0.08); color: var(--text); }
+
+    .new-tab-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      flex-shrink: 0;
+      -webkit-app-region: no-drag;
+      font-size: 16px;
+      border: none;
+      background: none;
+    }
+    .new-tab-btn:hover { background: var(--tab-hover); color: var(--text); }
+
+    .window-controls {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      -webkit-app-region: no-drag;
+      padding-left: 8px;
+    }
+    .window-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      border: none;
+      background: none;
+    }
+    .window-btn:hover { background: var(--tab-hover); color: var(--text); }
+    .window-btn.close:hover { background: #ef4444; color: white; }
+
+    .iframe-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .iframe-container iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: none;
+      background: white;
+    }
+    .iframe-container iframe.active { display: block; }
+
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      background: white;
+      z-index: 10;
+      transition: opacity 0.3s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .loading-text { font-size: 12px; color: var(--text-muted); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <div class="titlebar-spacer" id="titlebarSpacer"></div>
+    <div class="tab-bar" id="tabBar"></div>
+    <button class="new-tab-btn" id="newTabBtn" title="New Tab (⌘T)">+</button>
+    <div class="window-controls" id="windowControls">
+      <button class="window-btn" id="minimizeBtn" title="Minimize">
+        <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+      </button>
+      <button class="window-btn" id="maximizeBtn" title="Maximize">
+        <svg width="10" height="10" viewBox="0 0 10 10"><rect width="10" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+      </button>
+      <button class="window-btn close" id="closeBtn" title="Close">
+        <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1L9 9M9 1L1 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="iframe-container" id="iframeContainer">
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Starting Infinity...</div>
+    </div>
+  </div>
+
+  <script>
+    // electronAPI is exposed via preload.ts
+    const api = window.electronAPI;
+    let tabs = [];
+    let activeTabId = null;
+    let nextTabId = 1;
+    let BASE_URL = 'http://localhost:3099';
+
+    // Show window controls on non-macOS
+    if (navigator.platform.indexOf('Mac') === -1) {
+      document.getElementById('windowControls').style.display = 'flex';
+      document.getElementById('titlebarSpacer').style.width = '8px';
+    }
+
+    // Window controls
+    if (api) {
+      document.getElementById('minimizeBtn').addEventListener('click', () => api.minimize());
+      document.getElementById('maximizeBtn').addEventListener('click', () => api.maximize());
+      document.getElementById('closeBtn').addEventListener('click', () => api.close());
+    }
+
+    async function init() {
+      if (api) {
+        BASE_URL = await api.getNextUrl();
+      }
+
+      // Wait until the Next.js server is actually reachable
+      document.querySelector('.loading-text').textContent = 'Connecting to server...';
+      await waitForServer(BASE_URL);
+
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      createTab(BASE_URL + '/');
+    }
+
+    function waitForServer(url) {
+      return new Promise((resolve) => {
+        let attempts = 0;
+        function check() {
+          attempts++;
+          if (attempts > 1) {
+            document.querySelector('.loading-text').textContent =
+              'Waiting for server... (' + attempts + ')';
+          }
+          fetch(url, { mode: 'no-cors' })
+            .then(() => resolve())
+            .catch(() => setTimeout(check, 800));
+        }
+        check();
+      });
+    }
+
+    function createTab(url, title) {
+      const id = nextTabId++;
+      const tab = { id, url, title: title || 'New Tab', loaded: false };
+      tabs.push(tab);
+
+      // Create iframe
+      const iframe = document.createElement('iframe');
+      iframe.id = 'iframe-' + id;
+      iframe.src = url;
+      iframe.allow = 'clipboard-write';
+      document.getElementById('iframeContainer').appendChild(iframe);
+
+      // Poll iframe document.title to keep tab title in sync.
+      // This catches: Next.js client navigation, AI-generated <title>, etc.
+      tab._titleInterval = setInterval(() => {
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (!doc) return;
+          const t = doc.title;
+          if (t && t !== tab.title) {
+            tab.title = t;
+            renderTabs();
+            // Also update the Electron window title for the active tab
+            if (tab.id === activeTabId) {
+              document.title = t + ' — Infinity';
+            }
+          }
+        } catch(e) {}
+      }, 500);
+
+      iframe.addEventListener('load', () => {
+        tab.loaded = true;
+        // Immediately sync title on load
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (doc && doc.title && doc.title !== tab.title) {
+            tab.title = doc.title;
+            renderTabs();
+          }
+        } catch(e) {}
+      });
+
+      switchTab(id);
+      renderTabs();
+      return id;
+    }
+
+    function switchTab(id) {
+      activeTabId = id;
+      document.querySelectorAll('#iframeContainer iframe').forEach(f => {
+        f.classList.toggle('active', f.id === 'iframe-' + id);
+      });
+      renderTabs();
+    }
+
+    function closeTab(id) {
+      const idx = tabs.findIndex(t => t.id === id);
+      if (idx === -1) return;
+
+      // Clean up title polling interval
+      if (tabs[idx]._titleInterval) clearInterval(tabs[idx]._titleInterval);
+
+      const f = document.getElementById('iframe-' + id);
+      f?.remove();
+
+      tabs.splice(idx, 1);
+
+      if (tabs.length === 0) {
+        createTab(BASE_URL + '/');
+        return;
+      }
+
+      if (activeTabId === id) {
+        const newIdx = Math.min(idx, tabs.length - 1);
+        switchTab(tabs[newIdx].id);
+      } else {
+        renderTabs();
+      }
+    }
+
+    function renderTabs() {
+      const bar = document.getElementById('tabBar');
+      bar.innerHTML = '';
+
+      tabs.forEach(tab => {
+        const el = document.createElement('div');
+        el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+        el.innerHTML =
+          '<span class="tab-title">' + escapeHtml(tab.title) + '</span>' +
+          '<span class="tab-close" data-id="' + tab.id + '">&times;</span>';
+
+        el.addEventListener('click', (e) => {
+          if (e.target.classList.contains('tab-close')) return;
+          switchTab(tab.id);
+        });
+
+        el.addEventListener('auxclick', (e) => {
+          if (e.button === 1) { e.preventDefault(); closeTab(tab.id); }
+        });
+
+        el.querySelector('.tab-close').addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeTab(tab.id);
+        });
+
+        bar.appendChild(el);
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Listen for navigation messages from iframes
+    // (the Next.js app sends window.open which we can intercept)
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+      // Handle custom new-tab requests from the Next.js app
+      if (e.data.type === 'open-new-tab' && e.data.url) {
+        const url = e.data.url.startsWith('http') ? e.data.url : BASE_URL + e.data.url;
+        createTab(url);
+      }
+    });
+
+    // New tab button
+    document.getElementById('newTabBtn').addEventListener('click', () => {
+      createTab(BASE_URL + '/');
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+        e.preventDefault();
+        createTab(BASE_URL + '/');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+        e.preventDefault();
+        if (activeTabId) closeTab(activeTabId);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === ']') {
+        e.preventDefault();
+        const idx = tabs.findIndex(t => t.id === activeTabId);
+        if (idx < tabs.length - 1) switchTab(tabs[idx + 1].id);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === '[') {
+        e.preventDefault();
+        const idx = tabs.findIndex(t => t.id === activeTabId);
+        if (idx > 0) switchTab(tabs[idx - 1].id);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        const n = parseInt(e.key) - 1;
+        if (n < tabs.length) switchTab(tabs[n].id);
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

@@ -3,10 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.33.1",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "next dev --port 3099",
-    "build": "next build",
+    "dev:electron": "tsc -p electron/tsconfig.json && electron .",
+    "build": "mv src/app/api src/app/_api_bak 2>/dev/null; next build; mv src/app/_api_bak src/app/api 2>/dev/null; true",
+    "build:web": "mv src/app/api src/app/_api_bak 2>/dev/null; next build; mv src/app/_api_bak src/app/api 2>/dev/null; true",
+    "build:electron": "BUILD_TARGET=electron next build --webpack && tsc -p electron/tsconfig.json",
     "start": "next start --port 3099",
+    "electron": "tsc -p electron/tsconfig.json && electron .",
+    "dist": "pnpm build:electron && electron-builder",
+    "dist:mac": "pnpm build:electron && electron-builder --mac",
+    "dist:win": "pnpm build:electron && electron-builder --win",
+    "dist:linux": "pnpm build:electron && electron-builder --linux",
     "lint": "eslint"
   },
   "dependencies": {
@@ -20,9 +29,50 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^35.7.5",
+    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "build": {
+    "appId": "com.infinity.app",
+    "productName": "Infinity",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "electron/shell.html",
+      ".next/**/*",
+      "public/**/*",
+      "package.json",
+      "next.config.ts",
+      "node_modules/**/*"
+    ],
+    "extraResources": [],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "public/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
   }
 }

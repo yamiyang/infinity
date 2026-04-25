@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { savePage, getPage as getCachedPage, clearPageHtml, buildAncestryContext } from "@/lib/client-store";
 import { SelectionContext } from "@/types";
-import { isConfigured, getBasePath } from "@/lib/config";
+import { isConfigured, getBasePath, fetchElectronConfig, isElectronConfigured } from "@/lib/config";
+import { isElectron } from "@/lib/env";
 import { streamGeneratePage, streamRevisionPage, streamComponentContent } from "@/lib/openai";
 import { RevisionComment, buildAnnotatedHtml } from "@/lib/prompt";
 import { buildImageComponentScript } from "@/lib/image-component";
@@ -1102,6 +1103,10 @@ function PageContent() {
         const titleMatch = fullHtml.match(/<title>(.*?)<\/title>/i);
         const linkMatches = [...fullHtml.matchAll(/data-q="([^"]*)"/g)];
         const links = linkMatches.map((m) => m[1]).slice(0, 15);
+        const revTitle = titleMatch?.[1] || query;
+
+        // Update document.title so Electron tab title can track it
+        document.title = revTitle;
 
         savePage({
           id: pageId,
@@ -1109,7 +1114,7 @@ function PageContent() {
           html: fullHtml,
           createdAt: Date.now(),
           parentId,
-          title: titleMatch?.[1] || query,
+          title: revTitle,
           links,
           summary,
         });
@@ -1150,11 +1155,19 @@ function PageContent() {
   useEffect(() => {
     if (!query) return;
 
-    // Check if API key is configured
-    if (!isConfigured()) {
+    // Check if API key is configured (async for Electron)
+    let configReady = true;
+    if (isElectron()) {
+      // Load config from backend first
+      fetchElectronConfig().then(async () => {
+        const ready = await isElectronConfigured();
+        if (!ready) setPhase("error");
+      });
+    } else if (!isConfigured()) {
       setPhase("error");
-      return;
+      configReady = false;
     }
+    if (!configReady) return;
 
     const writer = getWriter();
 
@@ -1164,6 +1177,8 @@ function PageContent() {
       if (cached && cached.html) {
         writer?.writeComplete(cached.html);
         finalHtmlRef.current = cached.html;
+        // Set document.title from cached page (for Electron tab title)
+        if (cached.title) document.title = cached.title;
         setPhase("done");
         return;
       }
@@ -1173,6 +1188,8 @@ function PageContent() {
     writer?.reset();
     setPhase("streaming");
     setProgress(0);
+    // Set temporary title while generating (for Electron tab)
+    if (query) document.title = query;
 
     let cancelled = false;
     const abortController = new AbortController();
@@ -1220,7 +1237,7 @@ function PageContent() {
 
         if (rafId !== null) cancelAnimationFrame(rafId);
 
-        let finalHtml = fullHtml;
+        const finalHtml = fullHtml;
 
         // Extract AI-generated summary from meta tag
         let summary = "";
@@ -1233,8 +1250,12 @@ function PageContent() {
 
         // Persist to localStorage
         const titleMatch = finalHtml.match(/<title>(.*?)<\/title>/i);
+        const pageTitle = titleMatch?.[1] || query;
         const linkMatches = [...finalHtml.matchAll(/data-q="([^"]*)"/g)];
         const links = linkMatches.map((m) => m[1]).slice(0, 15);
+
+        // Update document.title so Electron tab title can track it
+        document.title = pageTitle;
 
         savePage({
           id: pageId,
@@ -1242,7 +1263,7 @@ function PageContent() {
           html: finalHtml,
           createdAt: Date.now(),
           parentId,
-          title: titleMatch?.[1] || query,
+          title: pageTitle,
           links,
           summary,
         });
