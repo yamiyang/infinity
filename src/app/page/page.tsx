@@ -311,7 +311,7 @@ const INTERACTION_SCRIPT = `
     // Parse rgba with alpha support
     function parseRGBA(str) {
       if (!str || str === 'transparent') return null;
-      var m = str.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?/);
+      var m = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
       if (!m) return null;
       return { r: +m[1], g: +m[2], b: +m[3], a: m[4] !== undefined ? +m[4] : 1 };
     }
