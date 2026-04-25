@@ -28,7 +28,7 @@ function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
   const displayTitle = node.title || node.query;
 
   const handleClick = () => {
-    const url = `/page/${node.id}?q=${encodeURIComponent(node.query)}${node.parentId ? `&parentId=${encodeURIComponent(node.parentId)}` : ""}`;
+    const url = `/page?id=${encodeURIComponent(node.id)}&q=${encodeURIComponent(node.query)}${node.parentId ? `&parentId=${encodeURIComponent(node.parentId)}` : ""}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -132,7 +132,7 @@ export default function HomePage() {
 
     setIsNavigating(true);
     const pageId = generateId();
-    window.location.href = `/page/${pageId}?q=${encodeURIComponent(text)}`;
+    window.location.href = `/page?id=${pageId}&q=${encodeURIComponent(text)}`;
   };
 
   const handleClearHistory = useCallback(() => {

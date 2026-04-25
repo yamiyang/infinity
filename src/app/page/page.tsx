@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, Suspense } from "react";
-import { useSearchParams, useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { savePage, getPage as getCachedPage, clearPageHtml, buildAncestryContext } from "@/lib/client-store";
 import { SelectionContext } from "@/types";
 import { isConfigured } from "@/lib/config";
@@ -207,11 +207,10 @@ class IncrementalIframeWriter {
 
 function PageContent() {
   const searchParams = useSearchParams();
-  const params = useParams();
   const query = searchParams.get("q") || "";
   const parentId = searchParams.get("parentId") || undefined;
   const scParam = searchParams.get("sc") || undefined;
-  const pageId = params.id as string;
+  const pageId = searchParams.get("id") || "";
 
   // Parse selection context from URL if present (from highlight-to-ask)
   const urlSelectionContext: SelectionContext | undefined = (() => {
@@ -276,7 +275,8 @@ function PageContent() {
           const q = url.searchParams.get("q");
           if (q) {
             const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-            const dest = new URL(`/page/${newPageId}`, window.location.origin);
+            const dest = new URL(`/page`, window.location.origin);
+            dest.searchParams.set("id", newPageId);
             dest.searchParams.set("q", q);
             dest.searchParams.set("parentId", pageId);
             const sc = url.searchParams.get("sc");
@@ -391,7 +391,7 @@ function PageContent() {
     const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const sc = encodeURIComponent(JSON.stringify(selectionCtx));
     window.open(
-      `/page/${newPageId}?q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}&sc=${sc}`,
+      `/page?id=${newPageId}&q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}&sc=${sc}`,
       "_blank",
       "noopener,noreferrer"
     );
@@ -586,7 +586,7 @@ function PageContent() {
     if (!trimmed || trimmed === query) return;
     const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     window.open(
-      `/page/${newPageId}?q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}`,
+      `/page?id=${newPageId}&q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}`,
       "_blank",
       "noopener,noreferrer"
     );
