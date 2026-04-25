@@ -852,6 +852,28 @@ function PageContent() {
       // Track when sub-components finish
       if (e.data.type === "inf-comp-finished") {
         setPendingComponents((n) => Math.max(0, n - 1));
+
+        // When all components done, update cached HTML with final DOM
+        const remaining = e.data.remaining as number;
+        if (remaining === 0) {
+          try {
+            const doc = iframeRef.current?.contentDocument;
+            if (doc?.documentElement) {
+              const finalDom = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+              finalHtmlRef.current = finalDom;
+              savePage({
+                id: pageId,
+                query,
+                html: finalDom,
+                createdAt: Date.now(),
+                parentId,
+                title: doc.title || query,
+                links: [...finalDom.matchAll(/data-q="([^"]*)"/g)].map((m) => m[1]).slice(0, 15),
+                summary: (doc.querySelector('meta[name="page-summary"]') as HTMLMetaElement)?.content || "",
+              });
+            }
+          } catch { /* ignore */ }
+        }
       }
     };
 
