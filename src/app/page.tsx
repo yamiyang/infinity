@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { buildSessionTrees, clearAllPages, TreeNode } from "@/lib/client-store";
+import { isConfigured } from "@/lib/config";
+import SettingsModal from "@/components/SettingsModal";
 
 const examples = [
   { text: "太阳系是什么样的？", icon: "🪐" },
@@ -21,12 +23,11 @@ function generateId(): string {
 // ============================================================
 
 function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
-  const [expanded, setExpanded] = useState(depth < 2); // Auto-expand first 2 levels
+  const [expanded, setExpanded] = useState(depth < 2);
   const hasChildren = node.children.length > 0;
   const displayTitle = node.title || node.query;
 
   const handleClick = () => {
-    // Open the cached page in a new tab
     const url = `/page/${node.id}?q=${encodeURIComponent(node.query)}${node.parentId ? `&parentId=${encodeURIComponent(node.parentId)}` : ""}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -34,7 +35,6 @@ function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
   return (
     <div className={depth > 0 ? "ml-4 border-l border-gray-100 pl-3" : ""}>
       <div className="group flex items-start gap-2 py-1.5">
-        {/* Expand/collapse toggle */}
         {hasChildren ? (
           <button
             onClick={() => setExpanded(!expanded)}
@@ -54,7 +54,6 @@ function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
           </span>
         )}
 
-        {/* Node content */}
         <button
           onClick={handleClick}
           className="flex-1 min-w-0 text-left cursor-pointer group/link"
@@ -69,7 +68,6 @@ function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
           )}
         </button>
 
-        {/* Child count badge */}
         {hasChildren && (
           <span className="mt-0.5 shrink-0 text-[10px] text-gray-300 bg-gray-50 rounded-full px-1.5 py-0.5">
             {node.children.length}
@@ -77,7 +75,6 @@ function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
         )}
       </div>
 
-      {/* Children (recursive) */}
       {expanded && hasChildren && (
         <div>
           {node.children.map((child) => (
@@ -98,16 +95,26 @@ export default function HomePage() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const isComposingRef = useRef(false); // Track IME composition (Chinese input)
+  const isComposingRef = useRef(false);
   const [trees, setTrees] = useState<TreeNode[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [configured, setConfigured] = useState(true);
 
   // Load session trees from localStorage
   useEffect(() => {
     const loaded = buildSessionTrees();
     setTrees(loaded);
     if (loaded.length > 0) setShowHistory(true);
+    setConfigured(isConfigured());
   }, []);
+
+  // Re-check config when settings modal closes
+  useEffect(() => {
+    if (!settingsOpen) {
+      setConfigured(isConfigured());
+    }
+  }, [settingsOpen]);
 
   // Auto-focus on mount
   useEffect(() => {
@@ -117,6 +124,12 @@ export default function HomePage() {
   const handleSubmit = (q?: string) => {
     const text = (q || query).trim();
     if (!text || isNavigating) return;
+
+    if (!isConfigured()) {
+      setSettingsOpen(true);
+      return;
+    }
+
     setIsNavigating(true);
     const pageId = generateId();
     window.location.href = `/page/${pageId}?q=${encodeURIComponent(text)}`;
@@ -138,6 +151,19 @@ export default function HomePage() {
       {/* Soft glow behind the logo */}
       <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-100/30 rounded-full blur-3xl" />
 
+      {/* Settings button (top-right) */}
+      <button
+        onClick={() => setSettingsOpen(true)}
+        className="fixed top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100/80 transition-all cursor-pointer"
+        title="设置"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        <span className="text-xs font-medium">设置</span>
+      </button>
+
       <div className={`relative z-10 flex flex-col items-center w-full max-w-2xl transition-all duration-500 ${showHistory ? "pt-16" : "justify-center min-h-screen"}`}>
         {/* Logo */}
         <div className="mb-3 flex items-center gap-3 select-none">
@@ -152,6 +178,19 @@ export default function HomePage() {
           问任何问题，探索无限可能
         </p>
 
+        {/* API Key warning */}
+        {!configured && (
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="mb-6 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-600 text-sm hover:bg-amber-100/80 transition-colors cursor-pointer"
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            请先配置 OpenAI API Key → 点击设置
+          </button>
+        )}
+
         {/* Search Input */}
         <div className="w-full relative">
           <div
@@ -163,7 +202,6 @@ export default function HomePage() {
               }
             `}
           >
-            {/* Search icon */}
             <div className="pl-5 pr-1">
               <svg className="h-[18px] w-[18px] text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="11" cy="11" r="8" />
@@ -186,7 +224,6 @@ export default function HomePage() {
               className="flex-1 bg-transparent px-3 py-4 text-[15px] text-gray-800 placeholder-gray-300 outline-none disabled:opacity-50"
             />
 
-            {/* Submit button */}
             <div className="pr-3">
               <button
                 onClick={() => handleSubmit()}
@@ -259,9 +296,12 @@ export default function HomePage() {
 
         {/* Footer hint */}
         <p className="mt-16 mb-8 text-[11px] text-gray-300 tracking-wide select-none">
-          内容由 AI 驱动，仅供参考
+          内容由 AI 驱动，仅供参考 · 纯前端运行，数据不经过服务器
         </p>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   );
 }

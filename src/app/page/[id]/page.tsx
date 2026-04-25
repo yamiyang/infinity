@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useParams } from "next/navigation";
 import { savePage, getPage as getCachedPage, clearPageHtml, buildAncestryContext } from "@/lib/client-store";
 import { SelectionContext } from "@/types";
+import { isConfigured } from "@/lib/config";
+import { streamGeneratePage } from "@/lib/openai";
 
 // ============================================================
 // Incremental DOM Streaming Engine
@@ -220,7 +222,6 @@ function PageContent() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const writerRef = useRef<IncrementalIframeWriter | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const [phase, setPhase] = useState<"loading" | "streaming" | "done" | "error">("loading");
   const [progress, setProgress] = useState(0);
   const finalHtmlRef = useRef<string>("");
@@ -245,7 +246,6 @@ function PageContent() {
   // Cleanup: abort generation when navigating away or unmounting
   useEffect(() => {
     const cleanup = () => {
-      readerRef.current?.cancel().catch(() => {});
       abortRef.current?.abort();
     };
 
@@ -268,11 +268,25 @@ function PageContent() {
     } else if (href.startsWith("http://") || href.startsWith("https://")) {
       window.open(href, "_blank", "noopener,noreferrer");
     } else {
+      // Handle /search?q=... links by generating a new pageId client-side
       let targetHref = href;
       try {
         const url = new URL(href, window.location.origin);
-        url.searchParams.set("parentId", pageId);
-        targetHref = url.pathname + url.search;
+        if (url.pathname === "/search") {
+          const q = url.searchParams.get("q");
+          if (q) {
+            const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+            const dest = new URL(`/page/${newPageId}`, window.location.origin);
+            dest.searchParams.set("q", q);
+            dest.searchParams.set("parentId", pageId);
+            const sc = url.searchParams.get("sc");
+            if (sc) dest.searchParams.set("sc", sc);
+            targetHref = dest.pathname + dest.search;
+          }
+        } else {
+          url.searchParams.set("parentId", pageId);
+          targetHref = url.pathname + url.search;
+        }
       } catch {
         const sep = href.includes("?") ? "&" : "?";
         targetHref = `${href}${sep}parentId=${encodeURIComponent(pageId)}`;
@@ -374,10 +388,10 @@ function PageContent() {
     const trimmed = (directQuery ?? selectionQuery).trim();
     if (!trimmed || !selectionCtx) return;
 
-    // Encode the selection context as a URL param
+    const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const sc = encodeURIComponent(JSON.stringify(selectionCtx));
     window.open(
-      `/search?q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}&sc=${sc}`,
+      `/page/${newPageId}?q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}&sc=${sc}`,
       "_blank",
       "noopener,noreferrer"
     );
@@ -397,6 +411,12 @@ function PageContent() {
   useEffect(() => {
     if (!query) return;
 
+    // Check if API key is configured
+    if (!isConfigured()) {
+      setPhase("error");
+      return;
+    }
+
     const writer = getWriter();
 
     // Check localStorage cache first (skip if refreshing)
@@ -410,7 +430,7 @@ function PageContent() {
       }
     }
 
-    // No cache — start streaming
+    // No cache — start streaming (direct LLM call from browser)
     writer?.reset();
     setPhase("streaming");
     setProgress(0);
@@ -421,34 +441,14 @@ function PageContent() {
 
     const generate = async () => {
       try {
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query,
-            pageId,
-            parentId,
-            // Build ancestry context from localStorage (client has full HTML cache)
-            history: buildAncestryContext(parentId),
-            // Include text selection context if user highlighted text before asking
-            selectionContext: urlSelectionContext,
-          }),
-          signal: abortController.signal,
-        });
+        // Build ancestry context from localStorage
+        const contextHistory = buildAncestryContext(parentId);
 
-        if (!res.ok || !res.body) {
-          if (!cancelled) setPhase("error");
-          return;
-        }
-
-        const reader = res.body.getReader();
-        readerRef.current = reader;
-        const decoder = new TextDecoder();
-        let buffer = ""; // All received content so far
+        // Stream AI-generated HTML directly from browser (single LLM call)
+        let buffer = "";
         let rafId: number | null = null;
         let needsRender = false;
 
-        // Throttled incremental render — at most once per animation frame
         const scheduleRender = () => {
           needsRender = true;
           if (rafId !== null) return;
@@ -456,56 +456,38 @@ function PageContent() {
             rafId = null;
             if (!needsRender || cancelled) return;
             needsRender = false;
-
-            // Incremental update: the writer only appends new content
             writer?.update(buffer);
             setProgress(buffer.length);
           });
         };
 
-        // Read the stream
-        while (true) {
-          if (cancelled) break;
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-
-          // Check for error marker
-          if (buffer.includes("<!--STREAM_ERROR:")) {
-            if (!cancelled) setPhase("error");
-            return;
-          }
-
-          scheduleRender();
-        }
+        const fullHtml = await streamGeneratePage(
+          query,
+          undefined,
+          undefined,
+          contextHistory,
+          (token: string) => {
+            if (cancelled || abortController.signal.aborted) return;
+            buffer += token;
+            scheduleRender();
+          },
+          undefined, // no prefetched data
+          urlSelectionContext,
+          abortController.signal
+        );
 
         if (cancelled) return;
 
-        // Cancel any pending animation frame
         if (rafId !== null) cancelAnimationFrame(rafId);
 
-        // Use the complete buffer as final HTML
-        let finalHtml = buffer;
+        let finalHtml = fullHtml;
 
-        // Strip markdown code fences
-        finalHtml = finalHtml.replace(/^```(?:html|HTML)?\s*\n?/, "");
-        finalHtml = finalHtml.replace(/\n?```\s*$/, "");
-
-        // Extract AI-generated summary from trailing marker or meta tag
+        // Extract AI-generated summary from meta tag
         let summary = "";
-        const trailingMatch = finalHtml.match(/<!--PAGE_SUMMARY:([\s\S]*?)-->/);
-        if (trailingMatch) {
-          summary = trailingMatch[1].trim();
-          finalHtml = finalHtml.replace(/<!--PAGE_SUMMARY:[\s\S]*?-->/, "");
-        }
-        if (!summary) {
-          const metaMatch = finalHtml.match(/<meta\s+name=["']page-summary["']\s+content=["']([^"']*)["']/i);
-          summary = metaMatch?.[1] || "";
-        }
+        const metaMatch = finalHtml.match(/<meta\s+name=["']page-summary["']\s+content=["']([^"']*)["']/i);
+        summary = metaMatch?.[1] || "";
 
-        // Final clean render with complete HTML (restores scroll pos)
+        // Final clean render
         writer?.finalize(finalHtml);
         finalHtmlRef.current = finalHtml;
 
@@ -536,7 +518,6 @@ function PageContent() {
         setPhase("error");
       } finally {
         abortRef.current = null;
-        readerRef.current = null;
       }
     };
 
@@ -544,7 +525,6 @@ function PageContent() {
 
     return () => {
       cancelled = true;
-      readerRef.current?.cancel().catch(() => {});
       abortController.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -552,13 +532,11 @@ function PageContent() {
 
   // Stop generation handler
   const handleStop = useCallback(() => {
-    readerRef.current?.cancel().catch(() => {});
     abortRef.current?.abort();
   }, []);
 
   // Refresh: clear cache and re-generate the page
   const handleRefresh = useCallback(() => {
-    readerRef.current?.cancel().catch(() => {});
     abortRef.current?.abort();
     clearPageHtml(pageId);
     finalHtmlRef.current = "";
@@ -606,8 +584,9 @@ function PageContent() {
   const handleCapsuleSubmit = useCallback(() => {
     const trimmed = capsuleQuery.trim();
     if (!trimmed || trimmed === query) return;
+    const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     window.open(
-      `/search?q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}`,
+      `/page/${newPageId}?q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}`,
       "_blank",
       "noopener,noreferrer"
     );
@@ -636,14 +615,26 @@ function PageContent() {
 
   // Error state
   if (phase === "error") {
+    const configured = isConfigured();
     return (
       <main className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-3xl text-indigo-400/40 mb-4">∞</p>
-          <p className="text-gray-400 mb-4">加载失败，请返回重试</p>
-          <a href="/" className="text-indigo-500 hover:text-indigo-600 text-sm">
-            ← 返回首页
-          </a>
+          {!configured ? (
+            <>
+              <p className="text-gray-400 mb-4">请先配置 API Key</p>
+              <a href="/" className="text-indigo-500 hover:text-indigo-600 text-sm">
+                ← 返回首页设置
+              </a>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-400 mb-4">加载失败，请返回重试</p>
+              <a href="/" className="text-indigo-500 hover:text-indigo-600 text-sm">
+                ← 返回首页
+              </a>
+            </>
+          )}
         </div>
       </main>
     );

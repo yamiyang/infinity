@@ -1,3 +1,5 @@
+"use client";
+
 import { HistoryItem, SelectionContext } from "@/types";
 
 export const SYSTEM_PROMPT = `You create stunning HTML pages that serve the user's intent perfectly. You have TWO modes — pick the right one based on what the user wants.
@@ -51,21 +53,11 @@ Output ONLY raw HTML. Start with <!DOCTYPE html>. No markdown fences, no explana
 </html>
 \`\`\`
 
-## 📦 PRE-FETCHED DATA
-You will receive **real data** in the user message under "## Available Data". This data has been fetched from real APIs before your generation starts. **USE THIS DATA DIRECTLY** in the HTML:
-
-- **images**: Array of {url, alt, source} — use these URLs directly in <img> tags. Do NOT use placeholder images.
-- **search**: Array of {title, url, snippet} — use for references, citations, related links, or content enrichment.
-- **news**: Array of {title, url, snippet, source, date} — use for recent events, trending topics.
-- **data**: Object with structured data — use for statistics, facts, comparisons.
-
-### HOW TO USE THE DATA:
-- **Directly embed** image URLs, text content, statistics into the HTML — no JavaScript needed for data rendering
-- **Images**: Use \`<img src="PROVIDED_URL" alt="PROVIDED_ALT" onerror="this.style.display='none'" />\` — include onerror to handle broken URLs
-- **Text data**: Write the actual text from search/news/data directly into the HTML elements
-- **Graceful degradation**: If a data category is empty or missing, simply omit that section or use your own knowledge
-- **No images? No problem**: If no images are provided, DON'T use placeholder services like picsum.photos or placehold.co. Instead, use beautiful CSS gradients, patterns, emojis, or SVG illustrations to make the page visually stunning without images.
-- You MAY still use small \`<script>\` tags for interactive UI behavior (tabs, toggles, etc.) but NOT for data fetching
+## CONTENT & IMAGES
+- Use your own knowledge to create rich, factual content
+- DON'T use placeholder image services like picsum.photos or placehold.co
+- Instead, use beautiful CSS gradients, patterns, emojis, or SVG illustrations for visual richness
+- You MAY use small \`<script>\` tags for interactive UI behavior (tabs, toggles, etc.)
 
 ## CRITICAL: NO ENTRY ANIMATIONS
 The page is rendered via streaming — HTML is rewritten multiple times during loading. Therefore:
@@ -168,7 +160,7 @@ This summary is used to build context when the user asks follow-up questions.
 OUTPUT ONLY THE HTML. NOTHING ELSE.`;
 
 /**
- * Pre-fetched data to be included in the user prompt.
+ * Pre-fetched data to be included in the user prompt (currently unused, kept for future extensibility).
  */
 export interface PrefetchedData {
   images?: Array<{ url: string; alt: string; source?: string }>;
@@ -182,7 +174,7 @@ export function buildUserPrompt(
   title: string | undefined,
   description: string | undefined,
   history: HistoryItem[],
-  prefetchedData?: PrefetchedData,
+  _prefetchedData?: PrefetchedData,
   selectionContext?: SelectionContext
 ): string {
   const parts: string[] = [];
@@ -212,43 +204,6 @@ export function buildUserPrompt(
     parts.push("- If the user's new query seems vague or short (e.g., \"告诉我更多\", \"对比一下\", \"怎么学\"), interpret it IN THE CONTEXT of what they were just reading.");
     parts.push("- Reference specific content from previous pages when relevant — show the user you \"remember\" what they explored.");
     parts.push("- Use a DIFFERENT visual style from all pages above.\n");
-  }
-
-  // Include pre-fetched data
-  if (prefetchedData) {
-    parts.push("## Available Data (pre-fetched from real APIs — use this directly in your HTML):\n");
-
-    if (prefetchedData.images && prefetchedData.images.length > 0) {
-      parts.push("### 🖼️ Images:");
-      parts.push("Use these real image URLs directly in <img> tags. Add `onerror=\"this.style.display='none'\"` to each.");
-      parts.push("```json");
-      parts.push(JSON.stringify(prefetchedData.images, null, 2));
-      parts.push("```\n");
-    }
-
-    if (prefetchedData.search && prefetchedData.search.length > 0) {
-      parts.push("### 🔍 Web Search Results:");
-      parts.push("Use for references, citations, content enrichment, or as source material.");
-      parts.push("```json");
-      parts.push(JSON.stringify(prefetchedData.search, null, 2));
-      parts.push("```\n");
-    }
-
-    if (prefetchedData.news && prefetchedData.news.length > 0) {
-      parts.push("### 📰 News:");
-      parts.push("Use for recent events, trending info.");
-      parts.push("```json");
-      parts.push(JSON.stringify(prefetchedData.news, null, 2));
-      parts.push("```\n");
-    }
-
-    if (prefetchedData.data && Object.keys(prefetchedData.data as Record<string, unknown>).length > 0) {
-      parts.push("### 📊 Structured Data:");
-      parts.push("Use for statistics, facts, comparisons.");
-      parts.push("```json");
-      parts.push(JSON.stringify(prefetchedData.data, null, 2));
-      parts.push("```\n");
-    }
   }
 
   // Include text selection context if user highlighted text before asking
