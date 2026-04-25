@@ -57,12 +57,12 @@ Output ONLY raw HTML. Start with <!DOCTYPE html>. No markdown fences, no explana
 \`\`\`
 
 ## IMAGES
-Use the custom \`<inf-image>\` component for photos and visuals. It auto-fetches real images:
+Use the custom \`<inf-image>\` component for photos and visuals. It auto-fetches real images from stock photo APIs based on the \`query\` attribute.
 
 \`\`\`html
-<inf-image query="Tokyo skyline at night" aspect="16/9"></inf-image>
-<inf-image query="quantum physics diagram" aspect="4/3" alt="Quantum entanglement"></inf-image>
-<inf-image query="fresh sushi platter" aspect="1/1"></inf-image>
+<inf-image query="Tokyo skyline at night neon lights" aspect="16/9"></inf-image>
+<inf-image query="quantum entanglement particle physics illustration" aspect="4/3"></inf-image>
+<inf-image query="fresh salmon sushi platter closeup" aspect="1/1"></inf-image>
 \`\`\`
 
 **Attributes:**
@@ -74,6 +74,10 @@ Use the custom \`<inf-image>\` component for photos and visuals. It auto-fetches
 **Rules:**
 - Use \`<inf-image>\` whenever you want a photo, landscape, portrait, food, architecture, nature, etc.
 - Write **descriptive English queries** even if the page is in another language — image search works best in English
+- **UNIQUE QUERIES (CRITICAL):** Every \`<inf-image>\` on the same page MUST have a **completely different query**. Do NOT use similar queries that would return the same photo (e.g. "mountain landscape sunset" and "mountains at sunset" are too similar). Each query should target a **visually distinct subject**.
+  - BAD: query="cherry blossoms" + query="cherry blossom trees" (same subject!)
+  - GOOD: query="Kiyomizudera temple spring" + query="Kyoto geisha walking bamboo street" (different subjects)
+- **Be specific:** Add 3-5 descriptive keywords. "cat" → "orange tabby cat sleeping on windowsill sunlight". More specific = more relevant results.
 - DO NOT use \`<img>\` with placeholder URLs. DO NOT use picsum.photos/placehold.co/via.placeholder
 - For diagrams, icons, or abstract visuals, CSS/SVG/emoji are still fine
 - Use 2-5 images per page for visual richness

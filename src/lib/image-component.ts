@@ -25,6 +25,9 @@ export function buildImageComponentScript(): string {
   var CACHE_PREFIX = 'inf-img-';
   var CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+  // Page-level dedup: track URLs already used on this page to avoid repeats
+  var _usedUrls = new Set();
+
   function cacheGet(query) {
     try {
       var raw = localStorage.getItem(CACHE_PREFIX + query);
@@ -41,71 +44,105 @@ export function buildImageComponentScript(): string {
     } catch(e) { /* full */ }
   }
 
-  function searchPixabay(query) {
-    if (!PIXABAY_KEY) return Promise.resolve(null);
-    var url = 'https://pixabay.com/api/?key=' + PIXABAY_KEY + '&q=' + encodeURIComponent(query) + '&image_type=photo&per_page=3&safesearch=true';
+  function cacheDel(query) {
+    try { localStorage.removeItem(CACHE_PREFIX + query); } catch(e) {}
+  }
+
+  // Pick best non-duplicate URL from an array of candidates
+  function pickBest(urls) {
+    // Prefer one not yet used on this page
+    for (var i = 0; i < urls.length; i++) {
+      if (!_usedUrls.has(urls[i])) return urls[i];
+    }
+    // All used — just return first
+    return urls.length > 0 ? urls[0] : null;
+  }
+
+  function searchPixabay(query, count) {
+    if (!PIXABAY_KEY) return Promise.resolve([]);
+    var url = 'https://pixabay.com/api/?key=' + PIXABAY_KEY + '&q=' + encodeURIComponent(query) + '&image_type=photo&per_page=' + count + '&safesearch=true';
     return fetch(url, { signal: AbortSignal.timeout(6000) })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.hits && d.hits.length > 0) return d.hits[0].webformatURL;
-        return null;
+        if (d.hits && d.hits.length > 0) return d.hits.map(function(h) { return h.webformatURL; });
+        return [];
       })
-      .catch(function() { return null; });
+      .catch(function() { return []; });
   }
 
-  function searchPexels(query) {
-    if (!PEXELS_KEY) return Promise.resolve(null);
-    return fetch('https://api.pexels.com/v1/search?query=' + encodeURIComponent(query) + '&per_page=3&orientation=landscape', {
+  function searchPexels(query, count) {
+    if (!PEXELS_KEY) return Promise.resolve([]);
+    return fetch('https://api.pexels.com/v1/search?query=' + encodeURIComponent(query) + '&per_page=' + count + '&orientation=landscape', {
       headers: { Authorization: PEXELS_KEY },
       signal: AbortSignal.timeout(6000)
     })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.photos && d.photos.length > 0) return d.photos[0].src.large;
-        return null;
+        if (d.photos && d.photos.length > 0) return d.photos.map(function(p) { return p.src.large; });
+        return [];
       })
-      .catch(function() { return null; });
+      .catch(function() { return []; });
   }
 
-  function searchUnsplash(query) {
-    if (!UNSPLASH_KEY) return Promise.resolve(null);
-    return fetch('https://api.unsplash.com/search/photos?query=' + encodeURIComponent(query) + '&per_page=3&orientation=landscape', {
+  function searchUnsplash(query, count) {
+    if (!UNSPLASH_KEY) return Promise.resolve([]);
+    return fetch('https://api.unsplash.com/search/photos?query=' + encodeURIComponent(query) + '&per_page=' + count + '&orientation=landscape', {
       headers: { Authorization: 'Client-ID ' + UNSPLASH_KEY },
       signal: AbortSignal.timeout(6000)
     })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.results && d.results.length > 0) return d.results[0].urls.regular;
-        return null;
+        if (d.results && d.results.length > 0) return d.results.map(function(r) { return r.urls.regular; });
+        return [];
       })
-      .catch(function() { return null; });
+      .catch(function() { return []; });
   }
 
-  async function findImage(query) {
-    var url = await searchPixabay(query);
-    if (url) return url;
-    url = await searchPexels(query);
-    if (url) return url;
-    url = await searchUnsplash(query);
-    if (url) return url;
+  async function findImage(query, excludeUrls) {
+    var exclude = excludeUrls || new Set();
+    var combined = new Set(exclude);
+    // Also exclude page-level used URLs
+    _usedUrls.forEach(function(u) { combined.add(u); });
+
+    // Try providers in order, return first non-excluded match
+    var urls = await searchPixabay(query, 5);
+    var filtered = urls.filter(function(u) { return !combined.has(u); });
+    if (filtered.length > 0) return filtered[0];
+    if (urls.length > 0 && filtered.length === 0) {
+      // All pixabay results excluded, still try others before falling back
+    }
+
+    urls = await searchPexels(query, 5);
+    filtered = urls.filter(function(u) { return !combined.has(u); });
+    if (filtered.length > 0) return filtered[0];
+
+    urls = await searchUnsplash(query, 5);
+    filtered = urls.filter(function(u) { return !combined.has(u); });
+    if (filtered.length > 0) return filtered[0];
+
+    // Nothing new — return any first result from any provider
     return null;
   }
+
+  // Refresh button SVG (circular arrow)
+  var REFRESH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10"/><path d="M3.51 15A9 9 0 0 0 18.36 18.36L23 14"/></svg>';
 
   class InfImage extends HTMLElement {
     connectedCallback() {
       var self = this;
-      var query = this.getAttribute('query') || '';
-      var aspect = this.getAttribute('aspect') || '16/9';
-      var alt = this.getAttribute('alt') || query;
+      this._query = this.getAttribute('query') || '';
+      this._aspect = this.getAttribute('aspect') || '16/9';
+      this._alt = this.getAttribute('alt') || this._query;
+      this._currentUrl = null;
 
-      if (!query) return;
+      if (!this._query) return;
 
       // Container styles
       this.style.display = 'block';
       this.style.position = 'relative';
       this.style.overflow = 'hidden';
       this.style.borderRadius = this.style.borderRadius || '0.5rem';
-      this.style.aspectRatio = aspect;
+      this.style.aspectRatio = this._aspect;
       this.style.width = this.style.width || '100%';
 
       // No API keys configured — show clickable prompt
@@ -116,7 +153,7 @@ export function buildImageComponentScript(): string {
           + '<div style="font-size:28px;opacity:0.5;">🖼️</div>'
           + '<div style="font-size:12px;color:rgba(99,102,241,0.7);text-align:center;line-height:1.4;max-width:80%;">'
           + '<div style="font-weight:600;margin-bottom:2px;">Click to configure image keys</div>'
-          + '<div style="font-size:10px;opacity:0.7;">' + query + '</div>'
+          + '<div style="font-size:10px;opacity:0.7;">' + this._query + '</div>'
           + '</div>'
           + '</div>';
         this.onclick = function(e) {
@@ -127,6 +164,14 @@ export function buildImageComponentScript(): string {
         return;
       }
 
+      this._loadImage(false);
+    }
+
+    _loadImage(forceRefresh) {
+      var self = this;
+      var query = this._query;
+      var alt = this._alt;
+
       this.style.background = 'linear-gradient(135deg, #e0e7ff 0%, #f0f9ff 50%, #ede9fe 100%)';
 
       // Shimmer placeholder
@@ -136,16 +181,27 @@ export function buildImageComponentScript(): string {
         + '</div>'
         + '<style>@keyframes inf-img-spin{to{transform:rotate(360deg)}}</style>';
 
-      // Check cache
-      var cached = cacheGet(query);
-      if (cached) {
-        self._renderImage(cached, alt);
-        return;
+      if (!forceRefresh) {
+        var cached = cacheGet(query);
+        if (cached) {
+          self._currentUrl = cached;
+          _usedUrls.add(cached);
+          self._renderImage(cached, alt);
+          return;
+        }
       }
 
-      // Search providers in order
-      findImage(query).then(function(url) {
+      // Build exclude set for refresh: exclude current URL
+      var exclude = new Set();
+      if (forceRefresh && self._currentUrl) {
+        exclude.add(self._currentUrl);
+        cacheDel(query);
+      }
+
+      findImage(query, exclude).then(function(url) {
         if (url) {
+          self._currentUrl = url;
+          _usedUrls.add(url);
           cacheSet(query, url);
           self._renderImage(url, alt);
         } else {
@@ -155,17 +211,41 @@ export function buildImageComponentScript(): string {
     }
 
     _renderImage(url, alt) {
+      var self = this;
       this.innerHTML = '';
       var img = document.createElement('img');
       img.src = url;
       img.alt = alt;
       img.loading = 'lazy';
       img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-      img.onerror = function() { this.parentElement._renderFallback(this.alt); }.bind(img);
+      img.onerror = function() { self._renderFallback(self._query); };
       this.appendChild(img);
+
+      // Refresh button — only visible on hover
+      var btn = document.createElement('button');
+      btn.innerHTML = REFRESH_SVG;
+      btn.title = 'Load different image';
+      btn.style.cssText = 'position:absolute;top:8px;right:8px;z-index:2;'
+        + 'width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;'
+        + 'background:rgba(0,0,0,0.45);color:#fff;'
+        + 'display:flex;align-items:center;justify-content:center;'
+        + 'opacity:0;transition:opacity 0.2s;backdrop-filter:blur(4px);';
+      btn.onmouseenter = function() { btn.style.opacity = '1'; };
+
+      // Show button on container hover, hide on leave
+      this.onmouseenter = function() { btn.style.opacity = '0.7'; };
+      this.onmouseleave = function() { btn.style.opacity = '0'; };
+
+      btn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        self._loadImage(true);
+      };
+      this.appendChild(btn);
     }
 
     _renderFallback(query) {
+      var self = this;
       var colors = [
         ['#667eea','#764ba2'],['#f093fb','#f5576c'],['#4facfe','#00f2fe'],
         ['#43e97b','#38f9d7'],['#fa709a','#fee140'],['#a18cd1','#fbc2eb']
@@ -174,6 +254,26 @@ export function buildImageComponentScript(): string {
       this.style.background = 'linear-gradient(135deg, ' + pair[0] + ', ' + pair[1] + ')';
       this.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,0.7);padding:12px;text-align:center;word-break:break-word;">'
         + query + '</div>';
+
+      // Refresh button on fallback too
+      var btn = document.createElement('button');
+      btn.innerHTML = REFRESH_SVG;
+      btn.title = 'Retry image search';
+      btn.style.cssText = 'position:absolute;top:8px;right:8px;z-index:2;'
+        + 'width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;'
+        + 'background:rgba(255,255,255,0.25);color:#fff;'
+        + 'display:flex;align-items:center;justify-content:center;'
+        + 'opacity:0;transition:opacity 0.2s;backdrop-filter:blur(4px);';
+      this.onmouseenter = function() { btn.style.opacity = '0.7'; };
+      this.onmouseleave = function() { btn.style.opacity = '0'; };
+      btn.onmouseenter = function() { btn.style.opacity = '1'; };
+      btn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        cacheDel(query);
+        self._loadImage(true);
+      };
+      this.appendChild(btn);
     }
 
     _hash(s) {
