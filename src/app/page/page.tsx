@@ -491,17 +491,42 @@ class IncrementalIframeWriter {
       this.injectedDuringStream = true;
     }
 
-    // Find the safe boundary — up to the last complete '>'
-    const lastGt = buffer.lastIndexOf(">");
-    if (lastGt === -1) return;
+    // Find the safe write boundary:
+    // 1. Must end at a '>' (complete tag)
+    // 2. Must NOT be inside an unclosed <script>...</script> block
+    const candidate = buffer.lastIndexOf(">");
+    if (candidate === -1) return;
 
-    const safeEnd = lastGt + 1;
+    let safeEnd = candidate + 1;
+    const region = buffer.slice(0, safeEnd);
+
+    // Check if we're inside an unclosed <script> tag
+    // Count <script (opening) vs </script> (closing) in the region
+    const openScripts = (region.match(/<script[\s>]/gi) || []).length;
+    const closeScripts = (region.match(/<\/script>/gi) || []).length;
+
+    if (openScripts > closeScripts) {
+      // We're inside an unclosed <script> — find the last safe point BEFORE this <script>
+      // Walk backwards to find the last </script> or the position before the unclosed <script>
+      const lastOpenScript = region.lastIndexOf("<script");
+      const altLastOpenScript = region.lastIndexOf("<SCRIPT");
+      const scriptStart = Math.max(lastOpenScript, altLastOpenScript);
+      if (scriptStart <= this.committedLength) return; // nothing safe to write
+      // Find the last '>' before this <script> tag
+      const safeBeforeScript = region.lastIndexOf(">", scriptStart - 1);
+      if (safeBeforeScript === -1 || safeBeforeScript + 1 <= this.committedLength) return;
+      safeEnd = safeBeforeScript + 1;
+    }
+
     if (safeEnd <= this.committedLength) return; // nothing new
 
-    // Extract only the new portion and write it (appends to existing doc)
-    const newChunk = buffer.slice(this.committedLength, safeEnd);
-    this.committedLength = safeEnd;
+    // Extract only the new portion
+    let newChunk = buffer.slice(this.committedLength, safeEnd);
 
+    // Sanitize script blocks
+    newChunk = this.sanitizeScripts(newChunk);
+
+    this.committedLength = safeEnd;
     doc.write(newChunk);
   }
 
@@ -517,12 +542,12 @@ class IncrementalIframeWriter {
       // Stream never started (or was reset); do a full write
       doc.open();
       doc.write(`<script>${this.imageScript}<\/script><script>${this.mapScript}<\/script><script>${this.componentScript}<\/script><script>${INTERACTION_SCRIPT}<\/script><style>${INTERACTION_STYLE}</style>`);
-      doc.write(finalHtml);
+      doc.write(this.sanitizeScripts(finalHtml));
       doc.close();
     } else {
       // Write any remaining content beyond what we've committed
       if (finalHtml.length > this.committedLength) {
-        doc.write(finalHtml.slice(this.committedLength));
+        doc.write(this.sanitizeScripts(finalHtml.slice(this.committedLength)));
       }
       doc.close();
 
@@ -538,6 +563,18 @@ class IncrementalIframeWriter {
   }
 
   /**
+   * Replace const/let with var inside <script> blocks in LLM-generated HTML.
+   * Prevents redeclaration errors when scripts re-execute during streaming.
+   */
+  private sanitizeScripts(html: string): string {
+    return html.replace(/<script[\s\S]*?<\/script>/gi, function(scriptBlock) {
+      return scriptBlock
+        .replace(/\bconst\s+/g, 'var ')
+        .replace(/\blet\s+/g, 'var ');
+    });
+  }
+
+  /**
    * Write complete HTML in one shot (used for cached pages, no streaming).
    */
   writeComplete(html: string) {
@@ -546,7 +583,7 @@ class IncrementalIframeWriter {
 
     doc.open();
     doc.write(`<script>${this.imageScript}<\/script><script>${this.mapScript}<\/script><script>${this.componentScript}<\/script><script>${INTERACTION_SCRIPT}<\/script><style>${INTERACTION_STYLE}</style>`);
-    doc.write(html);
+    doc.write(this.sanitizeScripts(html));
     doc.close();
 
     this.committedLength = html.length;

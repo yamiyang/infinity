@@ -201,10 +201,51 @@ Each \`<inf-component>\` triggers a **separate parallel LLM call**. See "Archite
 - Section headings go OUTSIDE: you write \`<h2>\`, the \`<inf-component>\` goes below
 - Do NOT use for: hero area, headings, images, maps, or 1-2 sentence transitions
 
-## CONTENT
+## CONTENT & INTERACTIVITY
 - Your direct output should be **lean**: skeleton, headings, transitions, hero text, links. Keep it SHORT.
 - Delegate substantive content to \`<inf-component>\`. Each component gets its own focused LLM call.
-- You MAY use small \`<script>\` tags for interactive UI behavior (tabs, toggles, etc.)
+- **ENCOURAGED: Use \`<script>\` tags for interactive behavior!** This makes pages feel alive, not static. The system automatically handles script safety during streaming. Examples:
+
+\`\`\`html
+<!-- Tab switching -->
+<div id="tabs">
+  <button onclick="showTab('overview')" class="tab-btn active">Overview</button>
+  <button onclick="showTab('details')" class="tab-btn">Details</button>
+</div>
+<div id="tab-overview" class="tab-panel">...</div>
+<div id="tab-details" class="tab-panel" style="display:none">...</div>
+<script>
+var activeTab = 'overview';
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('bg-indigo-500','text-white'); });
+  document.getElementById('tab-' + name).style.display = 'block';
+  event.target.classList.add('bg-indigo-500','text-white');
+}
+<\/script>
+
+<!-- Counter / vote -->
+<button onclick="var c=document.getElementById('count');c.textContent=+c.textContent+1">
+  👍 <span id="count">0</span>
+</button>
+
+<!-- Expand/collapse -->
+<button onclick="var d=this.nextElementSibling;d.style.display=d.style.display==='none'?'block':'none'">
+  Show more ▼
+</button>
+<div style="display:none">Hidden content...</div>
+
+<!-- Dark mode toggle -->
+<button onclick="document.body.classList.toggle('dark');document.body.classList.toggle('bg-gray-950')">
+  🌙 Toggle dark
+</button>
+\`\`\`
+
+**Script rules:**
+- Use \`var\` (not \`const\`/\`let\`) to avoid redeclaration errors during streaming
+- Keep scripts SHORT — under 20 lines each
+- Use inline \`onclick\`/\`onchange\` for simple interactions, \`<script>\` blocks for complex logic
+- Great use cases: tabs, toggles, accordions, counters, sort/filter, copy-to-clipboard, theme switching, simple calculators, quizzes
 
 ## CRITICAL: NO ENTRY ANIMATIONS
 The page is rendered via streaming — HTML is rewritten multiple times during loading. Therefore:
@@ -567,7 +608,7 @@ Output ONLY raw HTML fragment. No markdown fences, no explanation. Start immedia
 - Output a FRAGMENT — no <!DOCTYPE>, <html>, <head>, <body>, no <script src="tailwindcss">
 - Use **Tailwind CSS classes** (the parent page already loads Tailwind CDN)
 - **Match the style hint exactly** — use the color palette, typography, and card styles specified in the style hint. This ensures visual consistency with the parent page.
-- You MAY use small inline <script> for interactivity (tabs, toggles, counters)
+- You MAY use small inline <script> for interactivity (tabs, toggles, counters, sort, filter, quizzes). Use \`var\` not \`const\`/\`let\`. Keep scripts under 20 lines. Inline \`onclick\` handlers are preferred for simple interactions.
 - You MAY use <style> for component-specific styles (keep under 10 lines)
 - Make it visually polished — cards, tables, badges, gradients, icons (emoji)
 - NO entry animations (the parent page streams content incrementally)
