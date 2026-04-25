@@ -997,8 +997,8 @@ function PageContent() {
 
               // Clone DOM for caching, then strip inline-explain artifacts from the clone
               const clone = doc.documentElement.cloneNode(true) as HTMLElement;
-              // Remove inline explain components
-              clone.querySelectorAll("[data-inline-id]").forEach((el) => el.remove());
+              // Remove inline explain components (not the highlight wrappers)
+              clone.querySelectorAll("inf-component[data-inline-id]").forEach((el) => el.remove());
               // Remove inline highlight overlays
               clone.querySelectorAll("[data-inline-overlay]").forEach((el) => el.remove());
               // Unwrap <inf-highlight> back to plain text
@@ -1209,7 +1209,7 @@ function PageContent() {
           el.parentNode?.replaceChild(a, el);
         });
         // Strip inline-explain artifacts
-        clone.querySelectorAll("[data-inline-id]").forEach((el) => el.remove());
+        clone.querySelectorAll("inf-component[data-inline-id]").forEach((el) => el.remove());
         clone.querySelectorAll("[data-inline-overlay]").forEach((el) => el.remove());
         clone.querySelectorAll("inf-highlight").forEach((el) => {
           const parent = el.parentNode;
@@ -1507,7 +1507,7 @@ function PageContent() {
       if (doc?.documentElement) {
         const clone = doc.documentElement.cloneNode(true) as HTMLElement;
         // Strip inline-explain artifacts
-        clone.querySelectorAll("[data-inline-id]").forEach((el) => el.remove());
+        clone.querySelectorAll("inf-component[data-inline-id]").forEach((el) => el.remove());
         clone.querySelectorAll("[data-inline-overlay]").forEach((el) => el.remove());
         clone.querySelectorAll("inf-highlight").forEach((el) => {
           const parent = el.parentNode;
