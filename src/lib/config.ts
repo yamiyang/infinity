@@ -7,6 +7,9 @@ export interface AppConfig {
   openaiApiKey: string;
   openaiBaseUrl: string;
   openaiModel: string;
+  pixabayApiKey: string;
+  pexelsApiKey: string;
+  unsplashAccessKey: string;
 }
 
 export interface ModelPreset {
@@ -106,6 +109,9 @@ const DEFAULT_CONFIG: AppConfig = {
   openaiApiKey: "",
   openaiBaseUrl: "https://api.openai.com/v1",
   openaiModel: "gpt-4o",
+  pixabayApiKey: "",
+  pexelsApiKey: "",
+  unsplashAccessKey: "",
 };
 
 export function getPreset(id: string): ModelPreset | undefined {

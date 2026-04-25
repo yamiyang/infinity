@@ -53,10 +53,30 @@ Output ONLY raw HTML. Start with <!DOCTYPE html>. No markdown fences, no explana
 </html>
 \`\`\`
 
-## CONTENT & IMAGES
+## IMAGES
+Use the custom \`<inf-image>\` component for photos and visuals. It auto-fetches real images:
+
+\`\`\`html
+<inf-image query="Tokyo skyline at night" aspect="16/9"></inf-image>
+<inf-image query="quantum physics diagram" aspect="4/3" alt="Quantum entanglement"></inf-image>
+<inf-image query="fresh sushi platter" aspect="1/1"></inf-image>
+\`\`\`
+
+**Attributes:**
+- \`query\` (required): Descriptive English search terms for best results
+- \`aspect\`: Aspect ratio — "16/9" (default), "4/3", "1/1", "3/2", "21/9"
+- \`alt\`: Alt text (defaults to query)
+- Supports standard \`class\` and \`style\` for sizing/layout (e.g. \`class="w-full rounded-xl"\`)
+
+**Rules:**
+- Use \`<inf-image>\` whenever you want a photo, landscape, portrait, food, architecture, nature, etc.
+- Write **descriptive English queries** even if the page is in another language — image search works best in English
+- DO NOT use \`<img>\` with placeholder URLs. DO NOT use picsum.photos/placehold.co/via.placeholder
+- For diagrams, icons, or abstract visuals, CSS/SVG/emoji are still fine
+- Use 2-5 images per page for visual richness
+
+## CONTENT
 - Use your own knowledge to create rich, factual content
-- DON'T use placeholder image services like picsum.photos or placehold.co
-- Instead, use beautiful CSS gradients, patterns, emojis, or SVG illustrations for visual richness
 - You MAY use small \`<script>\` tags for interactive UI behavior (tabs, toggles, etc.)
 
 ## CRITICAL: NO ENTRY ANIMATIONS

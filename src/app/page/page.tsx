@@ -7,6 +7,8 @@ import { SelectionContext } from "@/types";
 import { isConfigured, getBasePath } from "@/lib/config";
 import { streamGeneratePage, streamRevisionPage } from "@/lib/openai";
 import { RevisionComment, buildAnnotatedHtml } from "@/lib/prompt";
+import { buildImageComponentScript } from "@/lib/image-component";
+import SettingsModal from "@/components/SettingsModal";
 
 // ============================================================
 // Incremental DOM Streaming Engine
@@ -311,12 +313,14 @@ const INTERACTION_STYLE = "body{padding-bottom:60px!important;} ::selection{back
  */
 class IncrementalIframeWriter {
   private iframe: HTMLIFrameElement;
-  private opened = false;       // whether doc.open() has been called
-  private committedLength = 0;  // how many chars of the buffer we've already written
-  private injectedDuringStream = false; // whether interaction scripts were injected via doc.write()
+  private opened = false;
+  private committedLength = 0;
+  private injectedDuringStream = false;
+  private imageScript: string;
 
   constructor(iframe: HTMLIFrameElement) {
     this.iframe = iframe;
+    this.imageScript = buildImageComponentScript();
   }
 
   /**
@@ -330,12 +334,7 @@ class IncrementalIframeWriter {
     if (!this.opened) {
       doc.open();
       this.opened = true;
-      // Inject interaction scripts immediately so links and text selection
-      // work during streaming, not just after finalize().
-      // We write a small inline <script> that sets up event listeners on
-      // the document as it's being parsed — they'll capture all future
-      // elements thanks to event delegation (listeners on `document`).
-      doc.write(`<script>${INTERACTION_SCRIPT}<\/script><style>${INTERACTION_STYLE}</style>`);
+      doc.write(`<script>${INTERACTION_SCRIPT}<\/script><script>${this.imageScript}<\/script><style>${INTERACTION_STYLE}</style>`);
       this.injectedDuringStream = true;
     }
 
@@ -364,10 +363,9 @@ class IncrementalIframeWriter {
     if (!this.opened) {
       // Stream never started (or was reset); do a full write
       doc.open();
+      doc.write(`<script>${this.imageScript}<\/script><script>${INTERACTION_SCRIPT}<\/script><style>${INTERACTION_STYLE}</style>`);
       doc.write(finalHtml);
       doc.close();
-      // Need to inject since we did a fresh doc.open()
-      this.injectInteraction();
     } else {
       // Write any remaining content beyond what we've committed
       if (finalHtml.length > this.committedLength) {
@@ -394,16 +392,15 @@ class IncrementalIframeWriter {
     if (!doc) return;
 
     doc.open();
+    doc.write(`<script>${this.imageScript}<\/script><script>${INTERACTION_SCRIPT}<\/script><style>${INTERACTION_STYLE}</style>`);
     doc.write(html);
     doc.close();
 
     this.committedLength = html.length;
     this.opened = false;
-
-    this.injectInteraction();
   }
 
-  /** Inject interaction styles + scripts into the current document */
+  /** Inject interaction styles + scripts + image component into the current document */
   private injectInteraction() {
     const doc = this.iframe.contentDocument;
     if (!doc) return;
@@ -412,6 +409,12 @@ class IncrementalIframeWriter {
       const style = doc.createElement("style");
       style.textContent = INTERACTION_STYLE;
       (doc.head || doc.documentElement || doc).appendChild(style);
+
+      // Inject <inf-image> Web Component BEFORE interaction script
+      // so any <inf-image> elements already in the DOM get upgraded
+      const imgScript = doc.createElement("script");
+      imgScript.textContent = this.imageScript;
+      (doc.body || doc.documentElement || doc).appendChild(imgScript);
 
       const script = doc.createElement("script");
       script.textContent = INTERACTION_SCRIPT;
@@ -461,6 +464,10 @@ function PageContent() {
 
   // Revision mode state
   const [revisionMode, setRevisionMode] = useState(false);
+
+  // Settings modal state (opened e.g. when clicking unconfigured <inf-image>)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"llm" | "image">("llm");
   const [revisionComments, setRevisionComments] = useState<RevisionComment[]>([]);
   const [revisionInput, setRevisionInput] = useState("");
   const [revisionPrompt, setRevisionPrompt] = useState(""); // additional instruction for revision
@@ -635,6 +642,10 @@ function PageContent() {
             }
           } catch { /* ignore */ }
         }
+      }
+      if (e.data.type === "open-image-settings") {
+        setSettingsTab("image");
+        setSettingsOpen(true);
       }
     };
 
@@ -1482,6 +1493,19 @@ function PageContent() {
           </div>{/* end toolbar row */}
         </div>
       </div>
+
+      {/* Settings Modal — opened from iframe <inf-image> click */}
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => {
+          setSettingsOpen(false);
+          // Rebuild image script with updated keys for future writes
+          if (writerRef.current) {
+            (writerRef.current as unknown as { imageScript: string }).imageScript = buildImageComponentScript();
+          }
+        }}
+        initialTab={settingsTab}
+      />
     </div>
   );
 }
