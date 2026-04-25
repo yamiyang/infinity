@@ -859,6 +859,16 @@ function PageContent() {
           try {
             const doc = iframeRef.current?.contentDocument;
             if (doc?.documentElement) {
+              // Replace <inf-component> with <div> so cached HTML won't re-trigger generation
+              doc.querySelectorAll("inf-component").forEach((el) => {
+                const div = doc.createElement("div");
+                div.innerHTML = el.innerHTML;
+                // Copy class and style
+                if (el.getAttribute("class")) div.setAttribute("class", el.getAttribute("class")!);
+                if (el.getAttribute("style")) div.setAttribute("style", el.getAttribute("style")!);
+                el.parentNode?.replaceChild(div, el);
+              });
+
               const finalDom = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
               finalHtmlRef.current = finalDom;
               savePage({
