@@ -963,7 +963,8 @@ function PageContent() {
           },
           undefined, // no prefetched data
           urlSelectionContext,
-          abortController.signal
+          abortController.signal,
+          { width: window.innerWidth, mobile: window.innerWidth < 640 }
         );
 
         if (cancelled) return;
@@ -1158,7 +1159,7 @@ function PageContent() {
               to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
             }
           `}</style>
-          <div className="bg-white/60 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl border border-white/40 shadow-[0_8px_40px_rgba(0,0,0,0.10),0_1.5px_6px_rgba(0,0,0,0.06)] p-3 w-[340px]">
+          <div className="bg-white/60 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl border border-white/40 shadow-[0_8px_40px_rgba(0,0,0,0.10),0_1.5px_6px_rgba(0,0,0,0.06)] p-3 w-[min(340px,calc(100vw-2rem))]">
             {/* Selected text preview */}
             <div className="text-xs text-gray-500/80 mb-2.5 flex items-center gap-1.5 px-0.5">
               <svg className="h-3 w-3 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -1273,88 +1274,90 @@ function PageContent() {
       {/* Bottom capsule */}
       <div
         ref={capsuleRef}
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20"
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-2rem)] max-w-[560px]"
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className={`
-            flex items-center bg-white/90 backdrop-blur-2xl backdrop-saturate-150 rounded-full border border-gray-200/80 shadow-[0_8px_40px_rgba(0,0,0,0.08),0_1.5px_6px_rgba(0,0,0,0.05)]
-            transition-all duration-300 ease-in-out overflow-hidden
-            ${(capsuleExpanded || revisionMode) ? "w-[560px] px-5 py-3" : "w-auto max-w-[320px] px-3 py-2"}
+            bg-white/90 backdrop-blur-2xl backdrop-saturate-150 border border-gray-200/80 shadow-[0_8px_40px_rgba(0,0,0,0.08),0_1.5px_6px_rgba(0,0,0,0.05)]
+            transition-all duration-300 ease-in-out overflow-hidden mx-auto
+            ${(capsuleExpanded || revisionMode) ? "rounded-2xl px-4 py-3 w-full" : "rounded-full px-3 py-2 w-auto max-w-[320px]"}
           `}
         >
-          {/* Home button */}
-          <a
-            href={`${getBasePath()}/`}
-            title="返回首页"
-            className="shrink-0 text-indigo-400 hover:text-indigo-600 transition-colors font-serif text-lg leading-none px-1 cursor-pointer"
-          >
-            ∞
-          </a>
-          <div className="w-px h-4 bg-gray-200 mx-1 shrink-0" />
-
-          {/* Search icon (normal mode) / Edit icon (revision mode) */}
-          {!revisionMode && (
-            <svg className={`${capsuleExpanded ? "h-5 w-5" : "h-3.5 w-3.5"} text-gray-600 shrink-0 transition-all`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-            </svg>
+          {/* Row 1: Input (only when expanded/revision) */}
+          {(capsuleExpanded || revisionMode) && (
+            <div className="flex items-center gap-2 mb-2">
+              {revisionMode ? (
+                <input
+                  type="text"
+                  value={revisionPrompt}
+                  onChange={(e) => setRevisionPrompt(e.target.value)}
+                  onCompositionStart={() => { isComposingRef.current = true; }}
+                  onCompositionEnd={() => { isComposingRef.current = false; }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isComposingRef.current && (revisionComments.length > 0 || revisionPrompt.trim())) handleApplyRevision();
+                    if (e.key === "Escape") { setRevisionMode(false); setRevisionComments([]); setRevisionPrompt(""); }
+                  }}
+                  placeholder="输入修订要求..."
+                  className="flex-1 bg-gray-50/80 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-amber-200/50 border border-gray-200/60 min-w-0"
+                />
+              ) : (
+                <>
+                  <input
+                    ref={capsuleInputRef}
+                    type="text"
+                    value={capsuleQuery}
+                    onChange={(e) => setCapsuleQuery(e.target.value)}
+                    onCompositionStart={() => { isComposingRef.current = true; }}
+                    onCompositionEnd={() => { isComposingRef.current = false; }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !isComposingRef.current) handleCapsuleSubmit();
+                      if (e.key === "Escape") { setCapsuleExpanded(false); setCapsuleQuery(query); }
+                    }}
+                    placeholder="输入新的问题..."
+                    className="flex-1 bg-gray-50/80 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-200/50 border border-gray-200/60 min-w-0"
+                  />
+                  <button
+                    onClick={handleCapsuleSubmit}
+                    disabled={!capsuleQuery.trim() || capsuleQuery.trim() === query}
+                    className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-indigo-500 text-white transition-all hover:bg-indigo-600 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
           )}
 
-          {/* Input area */}
-          {revisionMode ? (
-            /* Revision prompt input — always expanded */
-            <input
-              type="text"
-              value={revisionPrompt}
-              onChange={(e) => setRevisionPrompt(e.target.value)}
-              onCompositionStart={() => { isComposingRef.current = true; }}
-              onCompositionEnd={() => { isComposingRef.current = false; }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !isComposingRef.current && (revisionComments.length > 0 || revisionPrompt.trim())) handleApplyRevision();
-              }}
-              placeholder="可选：输入额外修订要求..."
-              className="flex-1 bg-transparent px-3 py-1 text-base text-gray-900 placeholder-gray-400 outline-none min-w-0"
-            />
-          ) : capsuleExpanded ? (
-            <input
-              ref={capsuleInputRef}
-              type="text"
-              value={capsuleQuery}
-              onChange={(e) => setCapsuleQuery(e.target.value)}
-              onCompositionStart={() => { isComposingRef.current = true; }}
-              onCompositionEnd={() => { isComposingRef.current = false; }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !isComposingRef.current) handleCapsuleSubmit();
-                if (e.key === "Escape") {
-                  setCapsuleExpanded(false);
-                  setCapsuleQuery(query);
-                }
-              }}
-              placeholder="输入新的问题..."
-              className="flex-1 bg-transparent px-3 py-1 text-base text-gray-900 placeholder-gray-400 outline-none min-w-0"
-            />
-          ) : (
-            <span
-              onClick={handleCapsuleInputClick}
-              className="text-xs text-gray-900 font-medium truncate px-2 cursor-text select-none"
+          {/* Row 2 (or only row when collapsed): toolbar buttons */}
+          <div className="flex items-center">
+            {/* Home button */}
+            <a
+              href={`${getBasePath()}/`}
+              title="返回首页"
+              className="shrink-0 text-indigo-400 hover:text-indigo-600 transition-colors font-serif text-lg leading-none px-1 cursor-pointer"
             >
-              {query}
-            </span>
-          )}
+              ∞
+            </a>
+            <div className="w-px h-4 bg-gray-200 mx-1 shrink-0" />
 
-          {/* Submit button (normal mode only) */}
-          {capsuleExpanded && !revisionMode && (
-            <button
-              onClick={handleCapsuleSubmit}
-              disabled={!capsuleQuery.trim() || capsuleQuery.trim() === query}
-              className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-indigo-500 text-white transition-all hover:bg-indigo-600 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
+            {/* Collapsed: query text + search icon (click to expand) */}
+            {!capsuleExpanded && !revisionMode && (
+              <>
+                <svg className="h-3.5 w-3.5 text-gray-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                </svg>
+                <span
+                  onClick={handleCapsuleInputClick}
+                  className="text-xs text-gray-900 font-medium truncate px-2 cursor-text select-none"
+                >
+                  {query}
+                </span>
+              </>
+            )}
 
           {/* Streaming status */}
           {(phase === "streaming" || phase === "loading") && (
@@ -1476,6 +1479,7 @@ function PageContent() {
               </button>
             </>
           )}
+          </div>{/* end toolbar row */}
         </div>
       </div>
     </div>

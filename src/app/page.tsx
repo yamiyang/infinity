@@ -6,11 +6,11 @@ import { isConfigured, getBasePath } from "@/lib/config";
 import SettingsModal from "@/components/SettingsModal";
 
 const examples = [
+  { text: "你能做什么", icon: "✨" },
   { text: "太阳系是什么样的？", icon: "🪐" },
   { text: "东京旅游攻略", icon: "🗼" },
   { text: "CPU 是如何工作的？", icon: "⚡" },
-  { text: "帮我写一个科幻短篇故事", icon: "✨" },
-  { text: "今天适合去哪里旅行？", icon: "🌍" },
+  { text: "帮我写一个科幻短篇故事", icon: "📖" },
   { text: "Python 入门指南", icon: "🐍" },
 ];
 
@@ -257,7 +257,7 @@ export default function HomePage() {
           {examples.map(({ text, icon }) => (
             <button
               key={text}
-              onClick={() => handleSubmit(text)}
+              onClick={() => { setQuery(text); inputRef.current?.focus(); }}
               disabled={isNavigating}
               className="group cursor-pointer rounded-full border border-gray-100 bg-white/80 px-4 py-2 text-[13px] text-gray-400 shadow-sm transition-all duration-200 hover:border-indigo-100 hover:bg-indigo-50/50 hover:text-indigo-500 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >

@@ -150,6 +150,12 @@ This summary is used to build context when the user asks follow-up questions.
 - Prefer Tailwind classes over custom CSS
 - Custom <style>: under 20 lines
 
+## DEVICE ADAPTATION
+The user message will include device info (screen width, mobile/desktop). Adapt your page:
+- **Mobile (width < 640px)**: Single column, larger tap targets (min 44px), shorter hero sections, text-3xl max for headings, no multi-column layouts, use vertical stacking
+- **Desktop (width >= 640px)**: Full visual richness, multi-column, large typography, expansive layouts
+- Always use responsive Tailwind classes (sm:, md:, lg:) but OPTIMIZE for the user's actual device
+
 ## RESTRICTIONS
 - **NO fixed/sticky bottom elements** — bottom 60px is reserved
 - Top-fixed headers are OK
@@ -175,9 +181,15 @@ export function buildUserPrompt(
   description: string | undefined,
   history: HistoryItem[],
   _prefetchedData?: PrefetchedData,
-  selectionContext?: SelectionContext
+  selectionContext?: SelectionContext,
+  deviceInfo?: { width: number; mobile: boolean }
 ): string {
   const parts: string[] = [];
+
+  // Device info
+  if (deviceInfo) {
+    parts.push(`## Device: ${deviceInfo.mobile ? "Mobile" : "Desktop"} (${deviceInfo.width}px width)\n`);
+  }
 
   if (history.length > 0) {
     parts.push("## User's exploration journey so far:");

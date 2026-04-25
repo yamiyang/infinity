@@ -33,11 +33,12 @@ export async function streamGeneratePage(
   onToken: (token: string) => void,
   prefetchedData?: PrefetchedData,
   selectionContext?: SelectionContext,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  deviceInfo?: { width: number; mobile: boolean }
 ): Promise<string> {
   const client = getClient();
   const model = getModel();
-  const userPrompt = buildUserPrompt(query, title, description, history, prefetchedData, selectionContext);
+  const userPrompt = buildUserPrompt(query, title, description, history, prefetchedData, selectionContext, deviceInfo);
 
   const stream = await client.chat.completions.create(
     {
