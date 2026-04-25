@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://ymssx.github.io/infinity/">✦ Try it now → ymssx.github.io/infinity</a>
+  <a href="https://yamiyang.github.io/infinity/">✦ Try it now → yamiyang.github.io/infinity</a>
 </p>
 
 ---
@@ -49,7 +49,7 @@ And when every link generates a new page that knows your full journey — what y
 
 ## Getting started
 
-Visit **[ymssx.github.io/infinity](https://ymssx.github.io/infinity/)**, click ⚙️ Settings, add your API key, and start exploring.
+Visit **[yamiyang.github.io/infinity](https://yamiyang.github.io/infinity/)**, click ⚙️ Settings, add your API key, and start exploring.
 
 Supports OpenAI, DeepSeek, Claude (via OpenRouter), Gemini, Qwen, Doubao, Zhipu GLM, or any OpenAI-compatible endpoint.
 
