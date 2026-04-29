@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>&lt;ai-component&gt; — AI Components</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+
+<div class="flex pt-14">
+<main class="flex-1 lg:ml-56 min-h-screen">
+  <div class="max-w-4xl mx-auto px-8 py-12 pb-32 space-y-16">
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <a href="../index.html">首页</a>
+      <span class="sep">/</span>
+      <a href="../index.html#components-preview">组件</a>
+      <span class="sep">/</span>
+      <span>&lt;ai-component&gt;</span>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Overview                                                      -->
+    <!-- ============================================================ -->
+    <section id="overview">
+      <div class="flex items-center gap-4 mb-4">
+        <h1 class="text-3xl font-black tracking-tight">&lt;ai-component&gt;</h1>
+        <span class="badge bg-green-50 text-green-600 border border-green-200">可用</span>
+      </div>
+      <p class="text-gray-500 mb-6 text-sm leading-relaxed max-w-2xl">
+        组件库的核心通用组件——接受任意自然语言 prompt，调用 LLM 流式生成并实时渲染 HTML 片段。
+        支持递归嵌套和深度感知（最多 3 层），每层自动调整生成策略。
+      </p>
+
+      <!-- Tab bar -->
+      <div class="tab-bar" id="mainTabs">
+        <div class="tab-item active" data-tab="docs" onclick="switchTab('docs')">📖 文档</div>
+        <div class="tab-item" data-tab="playground" onclick="switchTab('playground')">🎮 Playground</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- DOCS TAB                                                      -->
+    <!-- ============================================================ -->
+    <div id="tab-docs" class="tab-panel active space-y-16">
+
+      <!-- Props -->
+      <section id="props">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm">⚙️</span>
+          属性（Attributes）
+        </h2>
+        <div class="overflow-x-auto rounded-xl border border-gray-200">
+          <table class="api-table">
+            <thead>
+              <tr><th>属性</th><th>类型</th><th>默认值</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>p</code></td>
+                <td><code>string</code></td>
+                <td>—</td>
+                <td><strong>必填。</strong>自然语言提示词。设置后组件自动调用 LLM 并流式渲染结果。修改后重新生成。</td>
+              </tr>
+              <tr>
+                <td><code>data-depth</code></td>
+                <td><code>number</code></td>
+                <td>自动计算</td>
+                <td><em>只读。</em>组件自动设置的嵌套层级（1-3），可用于 CSS 选择器或调试。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Lifecycle -->
+      <section id="lifecycle">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">🔄</span>
+          生命周期
+        </h2>
+        <div class="space-y-2 text-sm text-gray-600">
+          <div class="flex gap-3 items-start p-3 bg-white rounded-lg border border-gray-100">
+            <span class="badge bg-green-50 text-green-600 shrink-0 mt-0.5">connected</span>
+            <span>组件挂载时计算嵌套层级（depth），读取 <code class="font-mono text-indigo-600">p</code> 属性并自动开始生成。先显示加载态（spinner + prompt 预览），流开始后切换到内容模式。</span>
+          </div>
+          <div class="flex gap-3 items-start p-3 bg-white rounded-lg border border-gray-100">
+            <span class="badge bg-amber-50 text-amber-600 shrink-0 mt-0.5">attribute</span>
+            <span><code class="font-mono text-indigo-600">p</code> 属性变化时，取消当前生成并重新执行。</span>
+          </div>
+          <div class="flex gap-3 items-start p-3 bg-white rounded-lg border border-gray-100">
+            <span class="badge bg-red-50 text-red-600 shrink-0 mt-0.5">disconnected</span>
+            <span>从 DOM 移除时自动取消正在进行的生成（通过 AbortController）。</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Nesting & Depth -->
+      <section id="nesting">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">📊</span>
+          嵌套 & 深度感知
+        </h2>
+
+        <p class="text-gray-500 mb-4 text-sm leading-relaxed">
+          <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">&lt;ai-component&gt;</code> 会自动检测自己在 DOM 树中的嵌套层级，并据此调整系统提示词中的生成策略。
+        </p>
+
+        <div class="overflow-x-auto rounded-xl border border-gray-200 mb-6">
+          <table class="api-table">
+            <thead>
+              <tr><th>层级</th><th>角色</th><th>行为</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>depth 1</code></td>
+                <td><span class="badge bg-indigo-50 text-indigo-600">骨架编排器</span></td>
+                <td>生成布局骨架（grid / flex），大量使用 <code>&lt;ai-component&gt;</code> 委派子任务</td>
+              </tr>
+              <tr>
+                <td><code>depth 2</code></td>
+                <td><span class="badge bg-purple-50 text-purple-600">段落构建器</span></td>
+                <td>渲染具体内容段落，可适度再分配 1-2 个子组件</td>
+              </tr>
+              <tr>
+                <td><code>depth 3</code></td>
+                <td><span class="badge bg-emerald-50 text-emerald-600">叶子节点</span></td>
+                <td>纯展示内容，<strong>禁止</strong>再嵌套 <code>&lt;ai-component&gt;</code></td>
+              </tr>
+              <tr>
+                <td><code>&gt; 3</code></td>
+                <td><span class="badge bg-red-50 text-red-600">阻断</span></td>
+                <td>不发起 LLM 请求，显示 "Maximum nesting depth exceeded" 警告</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Visual diagram -->
+        <div class="nesting-demo mb-6">
+          <div class="nesting-node border-indigo-300 bg-indigo-50/50 mb-0">
+            <span class="nesting-label text-indigo-600">depth 1 — 骨架编排器</span>
+            <div class="text-xs text-gray-400 mb-3 mt-2">LLM 生成布局骨架 + 委派子组件 ↓</div>
+            <div class="grid md:grid-cols-3 gap-3">
+              <div class="nesting-node border-purple-300 bg-purple-50/50">
+                <span class="nesting-label text-purple-600">depth 2</span>
+                <div class="text-xs text-gray-500 mt-2 text-center">p="用户统计卡片"</div>
+              </div>
+              <div class="nesting-node border-emerald-300 bg-emerald-50/50">
+                <span class="nesting-label text-emerald-600">depth 2</span>
+                <div class="text-xs text-gray-500 mt-2 text-center">p="收入趋势图"</div>
+              </div>
+              <div class="nesting-node border-amber-300 bg-amber-50/50">
+                <span class="nesting-label text-amber-600">depth 2</span>
+                <div class="nesting-node border-rose-300 bg-rose-50/50 mt-3">
+                  <span class="nesting-label text-rose-600">depth 3 (叶子)</span>
+                  <div class="text-xs text-gray-500 mt-2 text-center">纯内容，不再嵌套</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Usage Examples -->
+      <section id="examples">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center text-sm">💡</span>
+          使用示例
+        </h2>
+        <div class="space-y-6">
+          <div>
+            <h3 class="font-semibold text-sm mb-2 text-gray-700">基本用法</h3>
+            <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">&lt;!-- 最简单的用法 --&gt;</span>
+<span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"一个天气预报卡片"</span><span class="tag">&gt;&lt;/ai-component&gt;</span></pre>
+          </div>
+
+          <div>
+            <h3 class="font-semibold text-sm mb-2 text-gray-700">动态创建</h3>
+            <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="tag">&lt;script&gt;</span>
+  <span class="kw">const</span> el = document.<span class="fn">createElement</span>(<span class="str">'ai-component'</span>);
+  el.<span class="fn">setAttribute</span>(<span class="str">'p'</span>, <span class="str">'生成一个用户资料卡'</span>);
+  document.body.<span class="fn">appendChild</span>(el);
+
+  <span class="cmt">// 更新 prompt → 自动重新生成</span>
+  el.<span class="fn">setAttribute</span>(<span class="str">'p'</span>, <span class="str">'改成暗色主题的用户资料卡'</span>);
+
+  <span class="cmt">// 移除 → 自动取消生成</span>
+  el.<span class="fn">remove</span>();
+<span class="tag">&lt;/script&gt;</span></pre>
+          </div>
+
+          <div>
+            <h3 class="font-semibold text-sm mb-2 text-gray-700">嵌套使用（自动深度感知）</h3>
+            <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">&lt;!-- depth 1：编排器模式，自动生成布局 + 委派子组件 --&gt;</span>
+<span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"生成一个仪表盘布局，用 ai-component 分别展示统计卡片、图表和列表"</span><span class="tag">&gt;&lt;/ai-component&gt;</span>
+
+<span class="cmt">&lt;!-- LLM 可能输出类似这样的结构 --&gt;</span>
+<span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"grid grid-cols-2 gap-4"</span><span class="tag">&gt;</span>
+  <span class="cmt">&lt;!-- 这些子组件自动成为 depth 2（段落构建器）--&gt;</span>
+  <span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"用户统计卡片"</span><span class="tag">&gt;&lt;/ai-component&gt;</span>
+  <span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"收入趋势图表"</span><span class="tag">&gt;&lt;/ai-component&gt;</span>
+  <span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"最近订单列表"</span><span class="tag">&gt;&lt;/ai-component&gt;</span>
+  <span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"系统通知"</span><span class="tag">&gt;&lt;/ai-component&gt;</span>
+<span class="tag">&lt;/div&gt;</span></pre>
+          </div>
+
+          <div>
+            <h3 class="font-semibold text-sm mb-2 text-gray-700">CSS 按层级定制样式</h3>
+            <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">/* 利用自动设置的 data-depth 属性 */</span>
+<span class="tag">ai-component</span>[<span class="attr">data-depth</span>=<span class="str">"1"</span>] { <span class="attr">border</span>: <span class="num">2px</span> solid <span class="str">#6366f1</span>; }
+<span class="tag">ai-component</span>[<span class="attr">data-depth</span>=<span class="str">"2"</span>] { <span class="attr">border</span>: <span class="num">1px</span> solid <span class="str">#a5b4fc</span>; }
+<span class="tag">ai-component</span>[<span class="attr">data-depth</span>=<span class="str">"3"</span>] { <span class="attr">border</span>: <span class="num">1px</span> dashed <span class="str">#c7d2fe</span>; }</pre>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- tab-docs -->
+
+    <!-- ============================================================ -->
+    <!-- PLAYGROUND TAB                                                -->
+    <!-- ============================================================ -->
+    <div id="tab-playground" class="tab-panel space-y-8">
+
+      <section id="playground">
+        <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm">🎮</span>
+          Playground
+        </h2>
+        <p class="text-sm text-gray-500 mb-6">配置你的 LLM API，然后输入 prompt 体验实时流式生成。试试在 prompt 中要求生成嵌套的 <code class="text-xs">&lt;ai-component&gt;</code>！</p>
+
+        <!-- Config panel -->
+        <div class="rounded-2xl overflow-hidden mb-6 bg-white border border-gray-200">
+          <div class="px-5 py-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-gray-800 text-sm font-semibold">API 配置</span>
+              <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                <span class="w-2 h-2 rounded-full" id="statusDot" style="background:#ef4444;"></span>
+                <span id="statusText">未配置</span>
+              </div>
+            </div>
+            <!-- Presets -->
+            <div class="flex gap-2 mb-3 flex-wrap" id="presetContainer"></div>
+            <!-- Fields -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">API Key</label>
+                <input type="password" id="apiKey" class="config-input w-full" placeholder="sk-..." />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">Base URL</label>
+                <input type="text" id="baseUrl" class="config-input w-full" placeholder="https://api.openai.com/v1" />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">Model</label>
+                <input type="text" id="model" class="config-input w-full" placeholder="gpt-4o" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Examples -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">示例 Prompt</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="examplesGrid">
+            <div class="example-card" data-prompt="一个精美的用户资料卡片，包含头像、姓名、职位、简介和社交链接（GitHub、Twitter）">
+              <div class="text-lg mb-1">👤</div>
+              <div class="font-semibold text-sm">用户卡片</div>
+              <div class="text-xs text-gray-400 mt-1">头像 + 社交链接</div>
+            </div>
+            <div class="example-card" data-prompt="一个天气预报组件，显示今天和未来 4 天的天气，用 emoji 图标表示天气状况，包含温度、风力信息">
+              <div class="text-lg mb-1">🌤</div>
+              <div class="font-semibold text-sm">天气预报</div>
+              <div class="text-xs text-gray-400 mt-1">5 天天气预报</div>
+            </div>
+            <div class="example-card" data-prompt="一个 SaaS 产品定价表，3 个套餐（Starter $9/mo、Pro $29/mo、Enterprise 自定义），包含功能对比列表和 CTA 按钮">
+              <div class="text-lg mb-1">💰</div>
+              <div class="font-semibold text-sm">定价表</div>
+              <div class="text-xs text-gray-400 mt-1">3 个套餐对比</div>
+            </div>
+            <div class="example-card" data-prompt="生成一个仪表盘布局（grid 两列三行），每个格子是一个 <ai-component>，分别生成：用户统计卡片、收入趋势图（用 emoji 柱状图）、最新订单列表、任务看板、服务器状态、通知列表">
+              <div class="text-lg mb-1">🔄</div>
+              <div class="font-semibold text-sm">嵌套仪表盘</div>
+              <div class="text-xs text-gray-400 mt-1">⭐ 体验组件嵌套</div>
+            </div>
+            <div class="example-card" data-prompt="a beautiful music player UI with album artwork, song title, artist name, progress bar, play/pause/skip controls, and a mini playlist">
+              <div class="text-lg mb-1">🎵</div>
+              <div class="font-semibold text-sm">音乐播放器</div>
+              <div class="text-xs text-gray-400 mt-1">专辑封面 + 控制栏</div>
+            </div>
+            <div class="example-card" data-prompt="生成一个产品展示页，顶部是 hero 区域，下方分三个区域各用一个 <ai-component> 生成：功能特性网格、用户评价轮播、FAQ 手风琴">
+              <div class="text-lg mb-1">🧩</div>
+              <div class="font-semibold text-sm">递归产品页</div>
+              <div class="text-xs text-gray-400 mt-1">⭐ 递归自嵌套</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prompt input + generate -->
+        <div class="flex gap-3 mb-4">
+          <textarea id="promptInput" class="prompt-input flex-1" rows="2" placeholder="输入自然语言 prompt，试试让 LLM 在输出中嵌套 <ai-component>…"></textarea>
+          <div class="flex flex-col gap-2">
+            <button class="gen-btn flex-1 text-sm" id="genBtn" onclick="generate()">🚀 生成</button>
+            <button class="gen-btn danger flex-1 text-sm" id="stopBtn" style="display:none;" onclick="stopGeneration()">⏹ 停止</button>
+          </div>
+        </div>
+        <div class="text-xs text-gray-400 mb-4">按 <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Ctrl</kbd> + <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Enter</kbd> 快速生成</div>
+
+        <!-- Output -->
+        <div class="output-frame">
+          <div class="output-frame-header">
+            <div class="output-dot" style="background:#ef4444;"></div>
+            <div class="output-dot" style="background:#f59e0b;"></div>
+            <div class="output-dot" style="background:#22c55e;"></div>
+            <span class="text-xs text-gray-400 ml-2">OUTPUT</span>
+            <button class="ml-auto text-xs text-gray-400 hover:text-red-400 transition-colors" onclick="clearOutput()">清空</button>
+          </div>
+          <div class="p-5 overflow-auto" id="output" style="min-height: 200px;">
+            <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
+              <div class="text-center">
+                <div class="text-3xl mb-2">✨</div>
+                <div>选择一个示例或输入 prompt<br>AI 组件将在这里实时渲染<br><span class="text-xs text-indigo-300">嵌套的子组件也会自动展开！</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- tab-playground -->
+
+    <!-- Navigation -->
+    <div class="flex justify-between items-center pt-8 border-t border-gray-200">
+      <a href="../guide/architecture.html" class="text-sm text-gray-400 hover:text-indigo-600 transition-colors">← 架构原理</a>
+      <a href="../api/index.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">API 参考 →</a>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<!-- ============================================================ -->
+<!-- Scripts                                                        -->
+<!-- ============================================================ -->
+<script type="module">
+  import { renderNav, copyCode } from '../shared/nav.js';
+  import { configure, defineAIComponent } from '../../dist/ai-components.js';
+
+  renderNav({ currentPage: 'ai-component', basePath: '..' });
+  window.copyCode = copyCode;
+
+  // ============================================================
+  // Tab switching
+  // ============================================================
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    // Update URL hash for bookmarkability
+    if (tab === 'playground') {
+      history.replaceState(null, '', '#playground');
+    } else {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  // Auto-switch to playground if hash is #playground
+  if (window.location.hash === '#playground') {
+    switchTab('playground');
+  }
+
+  // ============================================================
+  // Provider presets
+  // ============================================================
+  const PRESETS = [
+    { id: 'openai',     name: 'OpenAI',            icon: '🟢', baseUrl: 'https://api.openai.com/v1',                                     defaultModel: 'gpt-4o' },
+    { id: 'deepseek',   name: 'DeepSeek',           icon: '🐋', baseUrl: 'https://api.deepseek.com',                                      defaultModel: 'deepseek-v4-flash' },
+    { id: 'claude',     name: 'Claude (OpenRouter)', icon: '🔮', baseUrl: 'https://openrouter.ai/api/v1',                                  defaultModel: 'anthropic/claude-sonnet-4' },
+    { id: 'gemini',     name: 'Gemini',             icon: '💎', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',        defaultModel: 'gemini-2.5-flash' },
+    { id: 'qwen',       name: 'Qwen',              icon: '☁️', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',              defaultModel: 'qwen-plus' },
+  ];
+
+  const STORAGE_KEY = 'aic_doc_config';
+
+  // ============================================================
+  // Config persistence
+  // ============================================================
+  function loadConfig() {
+    try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {}; }
+    catch { return {}; }
+  }
+  function saveConfig(cfg) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+
+  function applyConfig() {
+    const cfg = loadConfig();
+    document.getElementById('apiKey').value  = cfg.apiKey  || '';
+    document.getElementById('baseUrl').value = cfg.baseUrl || 'https://api.openai.com/v1';
+    document.getElementById('model').value   = cfg.model   || 'gpt-4o';
+    updateStatus();
+    highlightPreset(cfg.provider || '');
+  }
+
+  function readFormConfig() {
+    return {
+      apiKey:  document.getElementById('apiKey').value.trim(),
+      baseUrl: document.getElementById('baseUrl').value.trim(),
+      model:   document.getElementById('model').value.trim(),
+    };
+  }
+
+  function updateStatus() {
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const key  = document.getElementById('apiKey').value.trim();
+    dot.style.background = key ? '#22c55e' : '#ef4444';
+    text.textContent     = key ? '已配置' : '需要 API Key';
+  }
+
+  function persistConfig(extra = {}) {
+    saveConfig({ ...loadConfig(), ...readFormConfig(), ...extra });
+    updateStatus();
+  }
+
+  // ============================================================
+  // Presets
+  // ============================================================
+  function renderPresets() {
+    const container = document.getElementById('presetContainer');
+    PRESETS.forEach(p => {
+      const el = document.createElement('div');
+      el.className = 'preset-chip';
+      el.dataset.id = p.id;
+      el.textContent = `${p.icon} ${p.name}`;
+      el.onclick = () => {
+        document.getElementById('baseUrl').value = p.baseUrl;
+        document.getElementById('model').value   = p.defaultModel;
+        highlightPreset(p.id);
+        persistConfig({ provider: p.id });
+      };
+      container.appendChild(el);
+    });
+  }
+
+  function highlightPreset(id) {
+    document.querySelectorAll('.preset-chip').forEach(el =>
+      el.classList.toggle('active', el.dataset.id === id)
+    );
+  }
+
+  // ============================================================
+  // OpenAI-compatible streaming request
+  // ============================================================
+  async function* openaiRequest(prompt, options = {}) {
+    const cfg = readFormConfig();
+    if (!cfg.apiKey) throw new Error('请先在上方配置 API Key');
+
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cfg.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: cfg.model || 'gpt-4o',
+        messages: [
+          { role: 'system', content: options.systemPrompt || '' },
+          { role: 'user',   content: prompt },
+        ],
+        temperature: 0.85,
+        max_tokens: 4096,
+        stream: true,
+      }),
+      signal: options.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`API Error ${res.status}: ${err}`);
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') return;
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) yield content;
+        } catch {}
+      }
+    }
+  }
+
+  // ============================================================
+  // Init
+  // ============================================================
+  configure({ request: openaiRequest });
+  defineAIComponent();
+
+  renderPresets();
+  applyConfig();
+
+  // Auto-save config on input
+  ['apiKey', 'baseUrl', 'model'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => persistConfig());
+  });
+
+  // ============================================================
+  // Generation
+  // ============================================================
+  window.generate = function() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) return;
+
+    const cfg = readFormConfig();
+    if (!cfg.apiKey) { alert('请先配置 API Key'); return; }
+
+    persistConfig();
+
+    // Auto-switch to playground tab
+    switchTab('playground');
+
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+
+    const comp = document.createElement('ai-component');
+    comp.setAttribute('p', prompt);
+    output.appendChild(comp);
+
+    document.getElementById('genBtn').style.display  = 'none';
+    document.getElementById('stopBtn').style.display = '';
+
+    const check = setInterval(() => {
+      if (!comp._generating) {
+        clearInterval(check);
+        document.getElementById('genBtn').style.display  = '';
+        document.getElementById('stopBtn').style.display = 'none';
+      }
+    }, 300);
+  };
+
+  window.stopGeneration = function() {
+    const comp = document.getElementById('output').querySelector('ai-component');
+    if (comp) comp._cancel?.();
+    document.getElementById('genBtn').style.display  = '';
+    document.getElementById('stopBtn').style.display = 'none';
+  };
+
+  window.clearOutput = function() {
+    document.getElementById('output').innerHTML = `
+      <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
+        <div class="text-center">
+          <div class="text-3xl mb-2">✨</div>
+          <div>选择一个示例或输入 prompt<br>AI 组件将在这里实时渲染<br><span class="text-xs text-indigo-300">嵌套的子组件也会自动展开！</span></div>
+        </div>
+      </div>`;
+  };
+
+  // Example cards click
+  document.querySelectorAll('.example-card').forEach(card => {
+    card.addEventListener('click', () => {
+      switchTab('playground');
+      document.getElementById('promptInput').value = card.dataset.prompt;
+      document.getElementById('promptInput').focus();
+    });
+  });
+
+  // Ctrl+Enter
+  document.getElementById('promptInput').addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      window.generate();
+    }
+  });
+</script>
+</body>
+</html>

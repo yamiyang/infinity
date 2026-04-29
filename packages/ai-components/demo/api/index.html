@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API 参考 — AI Components</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+
+<div class="flex pt-14">
+<main class="flex-1 lg:ml-56 min-h-screen">
+  <div class="max-w-4xl mx-auto px-8 py-12 pb-32 space-y-16">
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <a href="../index.html">首页</a>
+      <span class="sep">/</span>
+      <span>API 参考</span>
+    </div>
+
+    <section>
+      <h1 class="text-3xl font-black mb-2 tracking-tight">API 参考</h1>
+      <p class="text-gray-500 mb-8">所有导出函数、类和类型的完整文档。</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- configure()                                                   -->
+    <!-- ============================================================ -->
+    <section id="api-configure">
+      <h2 class="font-bold text-lg mb-3 font-mono text-indigo-700">configure(config)</h2>
+      <p class="text-sm text-gray-500 mb-3">设置全局 LLM 请求函数。<strong>必须在任何 AI 组件连接之前调用。</strong>所有 AI 组件共享此配置。</p>
+      <div class="overflow-x-auto rounded-xl border border-gray-200">
+        <table class="api-table">
+          <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>config.request</code></td>
+              <td><code>LLMRequestFn</code></td>
+              <td><strong>必填。</strong>LLM 请求函数，必须返回 <code>AsyncIterable&lt;string&gt;</code></td>
+            </tr>
+            <tr>
+              <td><code>config.systemPrompt</code></td>
+              <td><code>string?</code></td>
+              <td>自定义系统提示词，覆盖内置默认值</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- defineAIComponent()                                           -->
+    <!-- ============================================================ -->
+    <section id="api-define">
+      <h2 class="font-bold text-lg mb-3 font-mono text-indigo-700">defineAIComponent()</h2>
+      <p class="text-sm text-gray-500 mb-3">
+        注册 <code>&lt;ai-component&gt;</code> 自定义元素到 <code>customElements</code>。防止重复注册。使用 IIFE 产物时会自动调用。
+      </p>
+      <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { defineAIComponent } <span class="kw">from</span> <span class="str">'ai-components'</span>;
+<span class="fn">defineAIComponent</span>();  <span class="cmt">// 只需调用一次</span></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- streamLLM()                                                   -->
+    <!-- ============================================================ -->
+    <section id="api-stream">
+      <h2 class="font-bold text-lg mb-3 font-mono text-indigo-700">streamLLM(prompt, signal?, depth?)</h2>
+      <p class="text-sm text-gray-500 mb-3">
+        底层流式生成函数。返回 <code>AsyncGenerator&lt;string&gt;</code>，逐 chunk yield LLM 输出文本。可脱离组件独立使用。
+      </p>
+      <div class="overflow-x-auto rounded-xl border border-gray-200 mb-4">
+        <table class="api-table">
+          <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>prompt</code></td><td><code>string</code></td><td>用户提示词</td></tr>
+            <tr><td><code>signal</code></td><td><code>AbortSignal?</code></td><td>中断信号，每次 yield 前检查</td></tr>
+            <tr><td><code>depth</code></td><td><code>number?</code></td><td>嵌套层级，影响系统提示词策略</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { streamLLM } <span class="kw">from</span> <span class="str">'ai-components'</span>;
+
+<span class="kw">const</span> ctrl = <span class="kw">new</span> AbortController();
+<span class="kw">for await</span> (<span class="kw">const</span> chunk <span class="kw">of</span> <span class="fn">streamLLM</span>(<span class="str">'写一首诗'</span>, ctrl.signal)) {
+  console.<span class="fn">log</span>(chunk);
+}
+<span class="cmt">// ctrl.abort() 可随时中断</span></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- IncrementalDOMBuilder                                         -->
+    <!-- ============================================================ -->
+    <section id="api-dom-builder">
+      <h2 class="font-bold text-lg mb-3 font-mono text-indigo-700">IncrementalDOMBuilder</h2>
+      <p class="text-sm text-gray-500 mb-3">
+        核心增量 DOM 构建引擎。接收流式 HTML 文本块，通过 <code>createElement</code> / <code>appendChild</code> 逐步构建 DOM 节点。也可独立使用。
+        <strong>构建出的 Custom Element 节点会自动触发其 <code>connectedCallback</code></strong>——这就是嵌套能力的底层实现。
+      </p>
+      <div class="overflow-x-auto rounded-xl border border-gray-200 mb-4">
+        <table class="api-table">
+          <thead><tr><th>方法</th><th>签名</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>constructor</code></td>
+              <td><code>new (root: HTMLElement)</code></td>
+              <td>创建构建器，指定根容器元素</td>
+            </tr>
+            <tr>
+              <td><code>write</code></td>
+              <td><code>(chunk: string) => void</code></td>
+              <td>输入一块 HTML 文本，完整标签立即构建 DOM，不完整标签缓冲等待</td>
+            </tr>
+            <tr>
+              <td><code>finish</code></td>
+              <td><code>() => void</code></td>
+              <td>结束构建：刷新缓冲区，自动关闭所有未闭合标签</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { IncrementalDOMBuilder } <span class="kw">from</span> <span class="str">'ai-components'</span>;
+
+<span class="kw">const</span> root = document.<span class="fn">getElementById</span>(<span class="str">'container'</span>);
+<span class="kw">const</span> builder = <span class="kw">new</span> <span class="fn">IncrementalDOMBuilder</span>(root);
+
+<span class="cmt">// 模拟流式输入</span>
+builder.<span class="fn">write</span>(<span class="str">'&lt;div class="card"&gt;'</span>);
+builder.<span class="fn">write</span>(<span class="str">'&lt;h2&gt;Hello&lt;/h2&gt;'</span>);
+builder.<span class="fn">write</span>(<span class="str">'&lt;ai-component p="嵌套的子组件"&gt;&lt;/ai-component&gt;'</span>);
+builder.<span class="fn">write</span>(<span class="str">'&lt;/div&gt;'</span>);
+builder.<span class="fn">finish</span>();</pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Types                                                         -->
+    <!-- ============================================================ -->
+    <section id="api-types">
+      <h2 class="font-bold text-lg mb-3 font-mono text-indigo-700">类型定义</h2>
+      <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">/** LLM 请求函数签名 */</span>
+<span class="kw">type</span> LLMRequestFn = (
+  prompt: <span class="str">string</span>,
+  options?: LLMRequestOptions,
+) =&gt; AsyncIterable&lt;<span class="str">string</span>&gt;;
+
+<span class="cmt">/** 请求选项 */</span>
+<span class="kw">interface</span> LLMRequestOptions {
+  signal?: AbortSignal;       <span class="cmt">// 中断信号</span>
+  systemPrompt?: <span class="str">string</span>;      <span class="cmt">// 系统提示词</span>
+}
+
+<span class="cmt">/** 全局配置（所有 AI 组件共享） */</span>
+<span class="kw">interface</span> AIComponentsConfig {
+  request: LLMRequestFn;      <span class="cmt">// 必填 — LLM 请求函数</span>
+  systemPrompt?: <span class="str">string</span>;      <span class="cmt">// 自定义系统提示词</span>
+}</pre>
+
+      <h3 class="font-semibold mt-6 mb-2 text-sm">辅助函数 & 常量</h3>
+      <div class="overflow-x-auto rounded-xl border border-gray-200">
+        <table class="api-table">
+          <thead><tr><th>函数/常量</th><th>返回值</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>getConfig()</code></td><td><code>AIComponentsConfig | null</code></td><td>获取当前配置</td></tr>
+            <tr><td><code>getRequestFn()</code></td><td><code>LLMRequestFn</code></td><td>获取请求函数，未配置则抛出错误</td></tr>
+            <tr><td><code>getSystemPrompt(depth?)</code></td><td><code>string</code></td><td>获取当前系统提示词（支持深度感知）</td></tr>
+            <tr><td><code>getDepthAwareSystemPrompt(depth)</code></td><td><code>string</code></td><td>获取指定深度的分层提示词</td></tr>
+            <tr><td><code>parseTag(tagStr)</code></td><td><code>ParsedToken | null</code></td><td>解析 HTML 标签字符串</td></tr>
+            <tr><td><code>parseAttributes(attrStr)</code></td><td><code>Record&lt;string, string&gt;</code></td><td>解析属性字符串</td></tr>
+            <tr><td><code>buildPrompt(prompt)</code></td><td><code>string</code></td><td>构建最终 prompt（预留扩展点）</td></tr>
+            <tr><td><code>SYSTEM_PROMPT</code></td><td><code>string</code></td><td>内置系统提示词常量（默认 depth 1）</td></tr>
+            <tr><td><code>MAX_DEPTH</code></td><td><code>3</code></td><td>最大嵌套深度限制</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- System Prompt                                                 -->
+    <!-- ============================================================ -->
+    <section id="system-prompt">
+      <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center text-sm">💬</span>
+        系统提示词
+      </h2>
+      <p class="text-sm text-gray-500 mb-4 leading-relaxed">
+        每个 AI 组件共享一个系统提示词，指导 LLM 输出适合流式渲染的 HTML 片段。你可以通过 <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">configure({ systemPrompt })</code> 覆盖。
+        系统提示词会根据组件的嵌套深度自动调整策略。
+      </p>
+      <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 leading-relaxed space-y-2">
+        <div>📋 <strong>核心规则：</strong></div>
+        <ul class="list-disc list-inside space-y-1 text-xs text-slate-600 ml-4">
+          <li>只输出 HTML 片段，不要 <code>&lt;!DOCTYPE&gt;</code>、<code>&lt;html&gt;</code>、<code>&lt;head&gt;</code>、<code>&lt;body&gt;</code></li>
+          <li>使用 Tailwind CSS 类名（假设父页面已加载 CDN）</li>
+          <li>响应式布局、视觉精美、语义化 HTML</li>
+          <li><strong>禁止入场动画</strong>（流式渲染会导致动画重复触发闪烁）</li>
+          <li>允许 hover 过渡和持续环境动画</li>
+          <li>允许 ≤20 行的内联 <code>&lt;script&gt;</code>（必须用 <code>var</code>）</li>
+          <li>不输出 markdown 围栏</li>
+          <li><strong>可以在输出中使用 <code>&lt;ai-component&gt;</code> 标签</strong>来将子任务委托给嵌套的 AI 组件</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Error Handling                                                -->
+    <!-- ============================================================ -->
+    <section id="error-handling">
+      <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-sm">🚨</span>
+        错误处理
+      </h2>
+      <div class="space-y-3">
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="font-semibold text-sm mb-1">未配置 request 函数</div>
+          <div class="text-xs text-gray-500">组件显示红色错误边框和提示文字。控制台抛出 <code>[ai-components] LLM request function not configured</code>。</div>
+        </div>
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="font-semibold text-sm mb-1">API 请求失败</div>
+          <div class="text-xs text-gray-500">request 函数抛出的错误会被捕获，组件切换到错误状态并显示 error.message。</div>
+        </div>
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="font-semibold text-sm mb-1">LLM 未返回内容</div>
+          <div class="text-xs text-gray-500">如果流结束但没有收到任何 HTML 标签，显示 "No content generated" 空状态。</div>
+        </div>
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="font-semibold text-sm mb-1">用户中断</div>
+          <div class="text-xs text-gray-500">通过 AbortController 中断生成时，组件保留已渲染的内容不清除。</div>
+        </div>
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="font-semibold text-sm mb-1">嵌套深度超限</div>
+          <div class="text-xs text-gray-500">超过 MAX_DEPTH (3) 的组件不会发起 LLM 请求，显示 "Maximum nesting depth exceeded" 警告。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Bundle Size                                                   -->
+    <!-- ============================================================ -->
+    <section id="bundle-size">
+      <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center text-sm">📊</span>
+        产物 & 体积
+      </h2>
+      <div class="overflow-x-auto rounded-xl border border-gray-200">
+        <table class="api-table">
+          <thead><tr><th>文件</th><th>格式</th><th>体积</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>ai-components.js</code></td><td>ESM</td><td>~12 KB</td><td>ES Module，支持 tree-shaking</td></tr>
+            <tr><td><code>ai-components.cjs</code></td><td>CJS</td><td>~14 KB</td><td>CommonJS，Node.js 兼容</td></tr>
+            <tr><td><code>ai-components.iife.global.js</code></td><td>IIFE</td><td>~8 KB</td><td>压缩产物，全局变量 <code>AIC</code>，可直接 &lt;script&gt; 引入</td></tr>
+            <tr><td><code>index.d.ts</code></td><td>TypeScript</td><td>~5 KB</td><td>完整类型声明</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-3 text-xs text-gray-400">
+        运行时零依赖。devDependencies 仅包含 tsup、TypeScript、vitest。<code>sideEffects: false</code> 支持 tree-shaking。
+      </div>
+    </section>
+
+    <!-- Navigation -->
+    <div class="flex justify-between items-center pt-8 border-t border-gray-200">
+      <a href="../components/ai-component.html" class="text-sm text-gray-400 hover:text-indigo-600 transition-colors">← &lt;ai-component&gt;</a>
+      <a href="../index.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">返回首页 →</a>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<script type="module">
+  import { renderNav, copyCode } from '../shared/nav.js';
+  renderNav({ currentPage: 'api', basePath: '..' });
+  window.copyCode = copyCode;
+</script>
+</body>
+</html>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>架构原理 — AI Components</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+
+<div class="flex pt-14">
+<main class="flex-1 lg:ml-56 min-h-screen">
+  <div class="max-w-4xl mx-auto px-8 py-12 pb-32 space-y-16">
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <a href="../index.html">首页</a>
+      <span class="sep">/</span>
+      <span>架构原理</span>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Architecture                                                  -->
+    <!-- ============================================================ -->
+    <section id="architecture">
+      <h1 class="text-3xl font-black mb-2 tracking-tight">架构原理</h1>
+      <p class="text-gray-500 mb-8">深入理解 AI Components 的内部工作机制。</p>
+
+      <div class="p-6 bg-white rounded-2xl border border-gray-200 space-y-4 mb-8">
+        <!-- Flow diagram -->
+        <div class="flex flex-col items-center gap-3">
+          <div class="arch-box w-full max-w-md border-indigo-200 bg-indigo-50">
+            <div class="text-xs text-indigo-400 mb-1">宿主应用</div>
+            <div class="font-semibold text-indigo-700">configure({ request: fn })</div>
+            <div class="text-xs text-indigo-400 mt-1">提供 LLM 请求函数（OpenAI 兼容 / 自定义）</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-box w-full max-w-md border-purple-200 bg-purple-50">
+            <div class="text-xs text-purple-400 mb-1">AI 组件</div>
+            <div class="font-semibold text-purple-700">&lt;ai-component p="prompt"&gt;</div>
+            <div class="text-xs text-purple-400 mt-1">connectedCallback → streamLLM() → 流式获取 HTML</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-box w-full max-w-md border-emerald-200 bg-emerald-50">
+            <div class="text-xs text-emerald-400 mb-1">核心引擎</div>
+            <div class="font-semibold text-emerald-700">IncrementalDOMBuilder</div>
+            <div class="text-xs text-emerald-400 mt-1">createElement / appendChild — 无 innerHTML，无闪烁</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-box w-full max-w-md border-amber-200 bg-amber-50">
+            <div class="text-xs text-amber-400 mb-1">最终输出（可包含嵌套组件）</div>
+            <div class="font-semibold text-amber-700">实时渲染的 DOM 节点树</div>
+            <div class="text-xs text-amber-400 mt-1">生成的 HTML 中若含 &lt;ai-component&gt;，会自动触发新一轮生成</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4 mb-12">
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="text-lg mb-2">🧩</div>
+          <div class="font-semibold text-sm mb-1">增量 DOM</div>
+          <div class="text-xs text-gray-500">不使用 innerHTML 替换，通过 createElement / appendChild 逐步构建，避免闪烁和 DOM 引用断裂。</div>
+        </div>
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="text-lg mb-2">🔄</div>
+          <div class="font-semibold text-sm mb-1">流式缓冲</div>
+          <div class="text-xs text-gray-500">跨 chunk 边界的不完整 HTML 标签会被缓冲，等待后续数据完成后再处理，保证解析正确性。</div>
+        </div>
+        <div class="p-4 bg-white rounded-xl border border-gray-200">
+          <div class="text-lg mb-2">🔄</div>
+          <div class="font-semibold text-sm mb-1">递归嵌套</div>
+          <div class="text-xs text-gray-500">LLM 输出中的 AI 组件标签会被浏览器自动识别为 Custom Element，触发新的生成流程。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Nesting & Composition                                         -->
+    <!-- ============================================================ -->
+    <section id="nesting">
+      <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">🔄</span>
+        组件嵌套 & 深度感知
+      </h2>
+
+      <p class="text-gray-500 mb-6 text-sm leading-relaxed">
+        AI Components 的核心特性之一是<strong>组件之间可以互相调用和嵌套</strong>。每个组件会自动感知自己的嵌套层级（depth），并据此调整生成策略。
+      </p>
+
+      <!-- Depth strategy -->
+      <div class="mb-8 p-5 bg-white rounded-xl border border-gray-200">
+        <h3 class="font-semibold text-base mb-4">📊 分层策略</h3>
+        <div class="overflow-x-auto rounded-xl border border-gray-200">
+          <table class="api-table">
+            <thead>
+              <tr><th>层级</th><th>角色</th><th>行为</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>depth 1</code></td>
+                <td><span class="badge bg-indigo-50 text-indigo-600">骨架编排器</span></td>
+                <td>生成布局骨架，大量使用 <code>&lt;ai-component&gt;</code> 委派子任务</td>
+              </tr>
+              <tr>
+                <td><code>depth 2</code></td>
+                <td><span class="badge bg-purple-50 text-purple-600">段落构建器</span></td>
+                <td>渲染具体内容，可适度再分配子组件</td>
+              </tr>
+              <tr>
+                <td><code>depth 3</code></td>
+                <td><span class="badge bg-emerald-50 text-emerald-600">叶子节点</span></td>
+                <td>纯展示内容，<strong>禁止</strong>再嵌套 <code>&lt;ai-component&gt;</code></td>
+              </tr>
+              <tr>
+                <td><code>&gt; 3</code></td>
+                <td><span class="badge bg-red-50 text-red-600">阻断</span></td>
+                <td>不发起 LLM 请求，显示警告信息</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Principle -->
+      <div class="mb-8">
+        <h3 class="font-semibold text-base mb-4">🧬 工作原理</h3>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="p-5 bg-white rounded-xl border border-gray-200 space-y-3">
+            <div class="font-semibold text-sm text-indigo-700">1. 为什么可以嵌套？</div>
+            <div class="text-xs text-gray-500 space-y-2">
+              <p>所有 AI 组件都是已注册的 <code>Custom Element</code>。当 <code>IncrementalDOMBuilder</code> 通过 <code>createElement()</code> 创建了一个 <code>&lt;ai-component&gt;</code> 节点并 <code>appendChild</code> 到 DOM 中时，浏览器会自动调用其 <code>connectedCallback()</code>，启动新一轮 LLM 生成。</p>
+              <p>这意味着：<strong>父组件不需要"知道"子组件的存在</strong>——浏览器的 Custom Element 生命周期机制天然支持。</p>
+            </div>
+          </div>
+          <div class="p-5 bg-white rounded-xl border border-gray-200 space-y-3">
+            <div class="font-semibold text-sm text-indigo-700">2. 执行时序</div>
+            <div class="text-xs text-gray-500 space-y-2">
+              <p>父组件边流式生成边构建 DOM。当某个 chunk 完成了 <code>&lt;ai-component p="..."&gt;</code> 标签的构建后，该子组件立即开始自己的 LLM 调用。</p>
+              <p>多个嵌套的子组件<strong>并行生成</strong>，各自独立发起 LLM 请求，互不阻塞。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual diagram -->
+      <div class="mb-8">
+        <h3 class="font-semibold text-base mb-4">📐 嵌套结构示意</h3>
+        <div class="nesting-demo">
+          <div class="nesting-node border-indigo-300 bg-indigo-50/50 mb-0">
+            <span class="nesting-label text-indigo-600">depth 1 — 骨架编排器</span>
+            <div class="text-xs text-gray-400 mb-3 mt-2">LLM 生成布局骨架 + 子组件 ↓</div>
+            <div class="grid md:grid-cols-3 gap-3">
+              <div class="nesting-node border-purple-300 bg-purple-50/50">
+                <span class="nesting-label text-purple-600">depth 2</span>
+                <div class="text-xs text-gray-500 mt-2 text-center">段落构建器</div>
+              </div>
+              <div class="nesting-node border-emerald-300 bg-emerald-50/50">
+                <span class="nesting-label text-emerald-600">depth 2</span>
+                <div class="text-xs text-gray-500 mt-2 text-center">段落构建器</div>
+              </div>
+              <div class="nesting-node border-amber-300 bg-amber-50/50">
+                <span class="nesting-label text-amber-600">depth 2</span>
+                <div class="nesting-node border-rose-300 bg-rose-50/50 mt-3">
+                  <span class="nesting-label text-rose-600">depth 3</span>
+                  <div class="text-xs text-gray-500 mt-2 text-center">叶子节点</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Composition patterns -->
+      <div>
+        <h3 class="font-semibold text-base mb-4">🎨 组合模式</h3>
+        <div class="space-y-3">
+          <div class="p-4 bg-white rounded-xl border border-gray-200">
+            <div class="font-semibold text-sm mb-2 flex items-center gap-2">
+              <span class="badge bg-indigo-50 text-indigo-600">布局委托</span>
+            </div>
+            <div class="text-xs text-gray-500">父组件负责布局框架（grid / flex），子组件负责各个区域的具体内容。</div>
+          </div>
+          <div class="p-4 bg-white rounded-xl border border-gray-200">
+            <div class="font-semibold text-sm mb-2 flex items-center gap-2">
+              <span class="badge bg-purple-50 text-purple-600">渐进细化</span>
+            </div>
+            <div class="text-xs text-gray-500">先用顶层组件生成粗略框架，嵌套的子组件进一步细化各个部分的实现。</div>
+          </div>
+          <div class="p-4 bg-white rounded-xl border border-gray-200">
+            <div class="font-semibold text-sm mb-2 flex items-center gap-2">
+              <span class="badge bg-emerald-50 text-emerald-600">异构组合</span>
+            </div>
+            <div class="text-xs text-gray-500">未来不同类型的 AI 组件可以相互嵌套，每种组件有自己专属的系统提示词和渲染逻辑。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigation -->
+    <div class="flex justify-between items-center pt-8 border-t border-gray-200">
+      <a href="./install.html" class="text-sm text-gray-400 hover:text-indigo-600 transition-colors">← 安装指南</a>
+      <a href="../components/ai-component.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">&lt;ai-component&gt; 组件 →</a>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<script type="module">
+  import { renderNav, copyCode } from '../shared/nav.js';
+  renderNav({ currentPage: 'architecture', basePath: '..' });
+  window.copyCode = copyCode;
+</script>
+</body>
+</html>

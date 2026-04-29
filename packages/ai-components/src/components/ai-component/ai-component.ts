@@ -8,11 +8,19 @@
 // The component calls the globally-configured LLM request function,
 // streams back HTML chunks, and incrementally builds DOM nodes
 // using recursive createElement / appendChild (no innerHTML flicker).
+//
+// Depth awareness:
+//   The component auto-detects its nesting depth by counting ancestor
+//   <ai-component> elements. The depth controls the system prompt:
+//     depth 1 → skeleton / orchestrator
+//     depth 2 → section builder
+//     depth 3 → leaf content (no further nesting allowed)
+//   Nesting beyond MAX_DEPTH is blocked with a visible error.
 // ============================================================
 
 import { IncrementalDOMBuilder } from "../../core/dom-builder";
 import { streamLLM } from "../../core/stream";
-import { buildPrompt } from "../../core/prompt";
+import { buildPrompt, MAX_DEPTH } from "../../core/prompt";
 
 export class AIComponent extends HTMLElement {
   /** Abort controller for the current generation */
@@ -27,6 +35,9 @@ export class AIComponent extends HTMLElement {
   /** Content container */
   private _contentEl: HTMLElement | null = null;
 
+  /** Nesting depth (1-based). Computed once on connect. */
+  private _depth = 1;
+
   static get observedAttributes(): string[] {
     return ["p"];
   }
@@ -35,9 +46,21 @@ export class AIComponent extends HTMLElement {
     const prompt = this.getAttribute("p") || "";
     if (!prompt) return;
 
+    // Compute nesting depth
+    this._depth = this._computeDepth();
+
+    // Block if exceeding max depth
+    if (this._depth > MAX_DEPTH) {
+      this._showDepthError();
+      return;
+    }
+
     // Base styles
     this.style.display = "block";
     if (!this.style.width) this.style.width = "100%";
+
+    // Store depth as a data attribute for CSS/debug introspection
+    this.dataset.depth = String(this._depth);
 
     this._generate(prompt);
   }
@@ -52,6 +75,29 @@ export class AIComponent extends HTMLElement {
       this._cancel();
       this._generate(newVal);
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Depth computation
+  // ------------------------------------------------------------------
+
+  /**
+   * Walk up the DOM tree and count how many <ai-component> ancestors
+   * exist above this element. Returns 1 for a top-level component.
+   */
+  private _computeDepth(): number {
+    let depth = 1;
+    let node: Node | null = this.parentNode;
+    while (node) {
+      if (
+        node instanceof HTMLElement &&
+        node.tagName.toLowerCase() === "ai-component"
+      ) {
+        depth++;
+      }
+      node = node.parentNode;
+    }
+    return depth;
   }
 
   /** Cancel any in-progress generation */
@@ -84,8 +130,8 @@ export class AIComponent extends HTMLElement {
       let prefixBuffer = "";
       let started = false;
 
-      // Stream and build DOM
-      for await (const chunk of streamLLM(finalPrompt, signal)) {
+      // Stream and build DOM — pass depth for depth-aware system prompt
+      for await (const chunk of streamLLM(finalPrompt, signal, this._depth)) {
         if (signal.aborted) return;
 
         if (!started) {
@@ -173,7 +219,7 @@ export class AIComponent extends HTMLElement {
     label.style.cssText =
       "font-size:11px;color:rgba(99,102,241,0.5);max-width:90%;text-align:center;" +
       "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-    label.textContent = `Generating: ${shortPrompt}`;
+    label.textContent = `Generating (depth ${this._depth}): ${shortPrompt}`;
 
     wrapper.appendChild(spinner);
     wrapper.appendChild(label);
@@ -188,6 +234,21 @@ export class AIComponent extends HTMLElement {
 
     this.innerHTML = "";
     this.appendChild(wrapper);
+  }
+
+  /** Show depth-exceeded error */
+  private _showDepthError(): void {
+    this.style.display = "block";
+
+    const msg = document.createElement("div");
+    msg.style.cssText =
+      "padding:12px;color:rgba(245,158,11,0.8);font-size:12px;text-align:center;" +
+      "border:1px dashed rgba(245,158,11,0.4);border-radius:0.5rem;" +
+      "background:rgba(245,158,11,0.05);";
+    msg.textContent =
+      `⚠️ Max nesting depth (${MAX_DEPTH}) exceeded — this <ai-component> was not rendered. ` +
+      `Prompt: "${(this.getAttribute("p") || "").slice(0, 80)}"`;
+    this.appendChild(msg);
   }
 
   /** Show empty state */

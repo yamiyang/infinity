@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>安装指南 — AI Components</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] } } }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+
+<div class="flex pt-14">
+<main class="flex-1 lg:ml-56 min-h-screen">
+  <div class="max-w-4xl mx-auto px-8 py-12 pb-32 space-y-16">
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <a href="../index.html">首页</a>
+      <span class="sep">/</span>
+      <span>安装指南</span>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Install                                                       -->
+    <!-- ============================================================ -->
+    <section id="install">
+      <h1 class="text-3xl font-black mb-2 tracking-tight">安装指南</h1>
+      <p class="text-gray-500 mb-8">几分钟内开始使用 AI Components 组件库。</p>
+
+      <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm">📦</span>
+        安装
+      </h2>
+      <div class="grid md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">npm / pnpm / yarn</div>
+          <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt"># 选择你的包管理器</span>
+npm install ai-components
+pnpm add ai-components
+yarn add ai-components</pre>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">CDN（&lt;script&gt; 标签）</div>
+          <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="str">"https://unpkg.com/ai-components/dist/ai-components.iife.global.js"</span><span class="tag">&gt;&lt;/script&gt;</span></pre>
+        </div>
+      </div>
+      <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+        <strong>💡 提示：</strong>IIFE 产物会自动注册 <code class="font-mono">AIC</code> 全局变量并调用 <code class="font-mono">defineAIComponent()</code>，你只需 <code class="font-mono">AIC.configure()</code> 即可使用。
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Quick Start                                                   -->
+    <!-- ============================================================ -->
+    <section id="quick-start">
+      <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">⚡</span>
+        快速开始
+      </h2>
+
+      <div class="space-y-6">
+        <!-- ESM -->
+        <div>
+          <h3 class="font-semibold text-base mb-3 flex items-center gap-2">
+            <span class="badge bg-blue-50 text-blue-600">推荐</span>
+            方式一：ESM 模块
+          </h3>
+          <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { configure, defineAIComponent } <span class="kw">from</span> <span class="str">'ai-components'</span>;
+
+<span class="cmt">// 1. 提供 LLM 请求函数（必须返回 AsyncIterable&lt;string&gt;）</span>
+<span class="fn">configure</span>({
+  <span class="attr">request</span>: <span class="kw">async function*</span>(<span class="attr">prompt</span>, <span class="attr">options</span>) {
+    <span class="cmt">// 调用你的 LLM API，逐 chunk yield 文本</span>
+    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/chat'</span>, {
+      method: <span class="str">'POST'</span>,
+      body: JSON.<span class="fn">stringify</span>({ prompt }),
+      signal: options?.signal,
+    });
+    <span class="kw">const</span> reader = res.body.<span class="fn">getReader</span>();
+    <span class="cmt">// ...解析 SSE 并 yield content</span>
+  }
+});
+
+<span class="cmt">// 2. 注册所有 AI 组件</span>
+<span class="fn">defineAIComponent</span>();</pre>
+        </div>
+
+        <!-- Script tag -->
+        <div>
+          <h3 class="font-semibold text-base mb-3">方式二：&lt;script&gt; 标签</h3>
+          <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="str">"ai-components/dist/ai-components.iife.global.js"</span><span class="tag">&gt;&lt;/script&gt;</span>
+<span class="tag">&lt;script&gt;</span>
+  AIC.<span class="fn">configure</span>({ <span class="attr">request</span>: yourRequestFn });
+<span class="tag">&lt;/script&gt;</span></pre>
+        </div>
+
+        <!-- Usage in HTML -->
+        <div>
+          <h3 class="font-semibold text-base mb-3">然后在 HTML 中使用</h3>
+          <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">&lt;!-- 设置 p 属性，组件自动调用 LLM 并流式渲染 --&gt;</span>
+<span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"生成一个精美的用户注册表单"</span><span class="tag">&gt;&lt;/ai-component&gt;</span>
+
+<span class="cmt">&lt;!-- 组件之间可以嵌套！LLM 输出的 HTML 中如果包含 &lt;ai-component&gt;，</span>
+<span class="cmt">     它们也会自动注册和渲染 --&gt;</span>
+<span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"生成一个仪表盘布局，其中包含多个子 ai-component 分别展示不同数据卡片"</span><span class="tag">&gt;&lt;/ai-component&gt;</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Configure LLM                                                 -->
+    <!-- ============================================================ -->
+    <section id="configure">
+      <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center text-sm">🔧</span>
+        配置 LLM
+      </h2>
+      <p class="text-gray-500 mb-4 text-sm leading-relaxed">
+        <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">configure()</code> 是使用任何 AI 组件前的必要步骤。你需要提供一个
+        <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">LLMRequestFn</code>，它接收 prompt 和 options，返回 <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">AsyncIterable&lt;string&gt;</code>。
+      </p>
+      <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">// 示例：接入 OpenAI 兼容 API</span>
+<span class="kw">async function*</span> <span class="fn">openaiRequest</span>(prompt, options) {
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'https://api.openai.com/v1/chat/completions'</span>, {
+    method: <span class="str">'POST'</span>,
+    headers: {
+      <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>,
+      <span class="str">'Authorization'</span>: <span class="str">`Bearer ${API_KEY}`</span>,
+    },
+    body: JSON.<span class="fn">stringify</span>({
+      model: <span class="str">'gpt-4o'</span>,
+      messages: [
+        { role: <span class="str">'system'</span>, content: options?.systemPrompt || <span class="str">''</span> },
+        { role: <span class="str">'user'</span>, content: prompt },
+      ],
+      stream: <span class="kw">true</span>,
+    }),
+    signal: options?.signal,
+  });
+
+  <span class="cmt">// 解析 SSE 流...</span>
+  <span class="kw">const</span> reader = res.body.<span class="fn">getReader</span>();
+  <span class="cmt">// ... yield 每个 delta.content</span>
+}
+
+<span class="fn">configure</span>({ request: openaiRequest });</pre>
+    </section>
+
+    <!-- Navigation -->
+    <div class="flex justify-between items-center pt-8 border-t border-gray-200">
+      <a href="../index.html" class="text-sm text-gray-400 hover:text-indigo-600 transition-colors">← 首页</a>
+      <a href="./architecture.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">架构原理 →</a>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<script type="module">
+  import { renderNav, copyCode } from '../shared/nav.js';
+  renderNav({ currentPage: 'install', basePath: '..' });
+  window.copyCode = copyCode;
+</script>
+</body>
+</html>

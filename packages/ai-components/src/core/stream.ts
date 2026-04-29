@@ -7,7 +7,7 @@
 // ============================================================
 
 import type { AIComponentsConfig, LLMRequestFn } from "./types";
-import { SYSTEM_PROMPT } from "./prompt";
+import { SYSTEM_PROMPT, getDepthAwareSystemPrompt } from "./prompt";
 
 let _config: AIComponentsConfig | null = null;
 
@@ -45,22 +45,28 @@ export function getRequestFn(): LLMRequestFn {
   return config.request;
 }
 
-/** Get the system prompt (custom or built-in) */
-export function getSystemPrompt(): string {
+/** Get the system prompt (custom or built-in, depth-aware) */
+export function getSystemPrompt(depth?: number): string {
   const config = getConfig();
-  return config?.systemPrompt || SYSTEM_PROMPT;
+  // If the user supplied a custom systemPrompt, use it as-is (they own the strategy)
+  if (config?.systemPrompt) return config.systemPrompt;
+  // Otherwise use the depth-aware built-in prompt
+  return depth != null ? getDepthAwareSystemPrompt(depth) : SYSTEM_PROMPT;
 }
 
 /**
  * Stream LLM content for a given prompt.
- * Returns an async iterable of string chunks.
+ * @param prompt  - user-facing prompt text
+ * @param signal  - optional AbortSignal
+ * @param depth   - nesting depth of the calling <ai-component> (1-based)
  */
 export async function* streamLLM(
   prompt: string,
   signal?: AbortSignal,
+  depth?: number,
 ): AsyncGenerator<string> {
   const requestFn = getRequestFn();
-  const systemPrompt = getSystemPrompt();
+  const systemPrompt = getSystemPrompt(depth);
 
   const iterable = requestFn(prompt, { signal, systemPrompt });
 

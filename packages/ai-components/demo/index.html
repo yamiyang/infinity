@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ai-components — 文档</title>
+  <title>AI 驱动的 AI Components 组件库</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./shared/styles.css" />
   <script>
     tailwind.config = {
       theme: {
@@ -19,792 +20,206 @@
       }
     }
   </script>
-  <style>
-    * { box-sizing: border-box; scroll-behavior: smooth; }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-
-    /* Code block */
-    pre.code-block {
-      background: #0f172a;
-      color: #e2e8f0;
-      border-radius: 12px;
-      padding: 20px 24px;
-      font-size: 13px;
-      line-height: 1.7;
-      overflow-x: auto;
-      position: relative;
-    }
-    pre.code-block .kw { color: #c084fc; }
-    pre.code-block .fn { color: #67e8f9; }
-    pre.code-block .str { color: #86efac; }
-    pre.code-block .cmt { color: #64748b; }
-    pre.code-block .tag { color: #f472b6; }
-    pre.code-block .attr { color: #fbbf24; }
-    pre.code-block .num { color: #fb923c; }
-
-    .copy-btn {
-      position: absolute; top: 12px; right: 12px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #94a3b8; border-radius: 6px;
-      padding: 4px 10px; font-size: 11px;
-      cursor: pointer; transition: all 0.2s;
-      font-family: 'Inter', sans-serif;
-    }
-    .copy-btn:hover { background: rgba(255,255,255,0.15); color: #e2e8f0; }
-
-    /* Sidebar */
-    .sidebar { scrollbar-width: thin; }
-    .sidebar a {
-      display: block; padding: 6px 16px; margin: 1px 0;
-      font-size: 13px; color: #64748b; border-radius: 6px;
-      text-decoration: none; transition: all 0.15s;
-    }
-    .sidebar a:hover { color: #6366f1; background: #eef2ff; }
-    .sidebar a.active { color: #6366f1; background: #eef2ff; font-weight: 600; }
-    .sidebar .section-title {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.05em; color: #94a3b8;
-      padding: 16px 16px 4px; margin-top: 4px;
-    }
-
-    /* Config panel */
-    .config-input {
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-      color: #e0e7ff; border-radius: 8px; padding: 8px 12px;
-      font-size: 13px; outline: none; transition: border-color 0.2s;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .config-input:focus { border-color: rgba(129,140,248,0.5); }
-    .config-input::placeholder { color: rgba(199,210,254,0.3); }
-
-    /* Playground */
-    .prompt-input {
-      resize: none; background: white; border: 2px solid #e2e8f0;
-      border-radius: 12px; padding: 12px 16px; font-size: 14px;
-      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
-      font-family: 'Inter', sans-serif;
-    }
-    .prompt-input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,0.12); }
-
-    /* API table */
-    .api-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .api-table th { text-align: left; padding: 10px 16px; background: #f8fafc; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
-    .api-table td { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
-    .api-table tr:last-child td { border-bottom: none; }
-    .api-table code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #6366f1; font-family: 'JetBrains Mono', monospace; }
-
-    /* Preset chips */
-    .preset-chip {
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 6px; padding: 5px 10px; cursor: pointer;
-      transition: all 0.2s; font-size: 12px; color: #c7d2fe;
-    }
-    .preset-chip:hover { background: rgba(255,255,255,0.12); }
-    .preset-chip.active { border-color: #818cf8; background: rgba(129,140,248,0.15); }
-
-    /* Badge */
-    .badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600;
-    }
-
-    /* Example card */
-    .example-card {
-      border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px;
-      cursor: pointer; transition: all 0.2s; background: white;
-    }
-    .example-card:hover { border-color: #c7d2fe; box-shadow: 0 4px 16px rgba(99,102,241,0.08); transform: translateY(-1px); }
-
-    /* Gen button */
-    .gen-btn {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      color: white; border: none; border-radius: 10px;
-      padding: 10px 20px; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-    }
-    .gen-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.35); }
-    .gen-btn:active { transform: translateY(0); }
-    .gen-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-    .gen-btn.danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
-
-    /* Architecture diagram */
-    .arch-box {
-      border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px;
-      background: white; font-size: 13px; text-align: center;
-      transition: all 0.2s;
-    }
-    .arch-box:hover { border-color: #c7d2fe; box-shadow: 0 2px 8px rgba(99,102,241,0.08); }
-    .arch-arrow { color: #94a3b8; font-size: 18px; }
-
-    /* Section styling */
-    section[id] { scroll-margin-top: 32px; }
-
-    /* Output area */
-    .output-frame {
-      border: 1px solid #e5e7eb; border-radius: 12px;
-      min-height: 240px; background: white; overflow: hidden;
-    }
-    .output-frame-header {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 14px; background: #f8fafc; border-bottom: 1px solid #e5e7eb;
-    }
-    .output-dot { width: 8px; height: 8px; border-radius: 50%; }
-  </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 antialiased">
 
-<!-- ============================================================ -->
-<!-- Top Navigation Bar                                            -->
-<!-- ============================================================ -->
-<nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200/60 h-14 flex items-center px-6">
-  <div class="flex items-center gap-3">
-    <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">AI</div>
-    <span class="font-bold text-base">ai-components</span>
-    <span class="badge bg-indigo-50 text-indigo-600">v0.1.0</span>
-  </div>
-  <div class="ml-auto flex items-center gap-4">
-    <a href="https://github.com/nicepkg/infinity" target="_blank" class="text-gray-400 hover:text-gray-600 transition-colors text-sm">GitHub</a>
-  </div>
-</nav>
-
 <div class="flex pt-14">
-
-<!-- ============================================================ -->
-<!-- Left Sidebar                                                  -->
-<!-- ============================================================ -->
-<aside class="sidebar fixed left-0 top-14 bottom-0 w-56 border-r border-gray-200/60 bg-white/50 backdrop-blur-sm overflow-y-auto py-4 hidden lg:block">
-  <div class="section-title">开始</div>
-  <a href="#intro" class="active">介绍</a>
-  <a href="#install">安装</a>
-  <a href="#quick-start">快速开始</a>
-
-  <div class="section-title">核心概念</div>
-  <a href="#architecture">架构原理</a>
-  <a href="#configure">配置 LLM</a>
-  <a href="#component">组件用法</a>
-
-  <div class="section-title">API 参考</div>
-  <a href="#api-configure"><code>configure()</code></a>
-  <a href="#api-define"><code>defineAIComponent()</code></a>
-  <a href="#api-stream"><code>streamLLM()</code></a>
-  <a href="#api-dom-builder"><code>IncrementalDOMBuilder</code></a>
-  <a href="#api-types">类型定义</a>
-
-  <div class="section-title">进阶</div>
-  <a href="#system-prompt">系统提示词</a>
-  <a href="#error-handling">错误处理</a>
-  <a href="#bundle-size">产物 & 体积</a>
-
-  <div class="section-title mt-2 !text-indigo-500">在线体验</div>
-  <a href="#playground" class="!text-indigo-600 !font-semibold">🎮 Playground</a>
-</aside>
-
-<!-- ============================================================ -->
-<!-- Main Content                                                  -->
-<!-- ============================================================ -->
 <main class="flex-1 lg:ml-56 min-h-screen">
 
-  <!-- Hero Section -->
+  <!-- ============================================================ -->
+  <!-- Hero Section                                                  -->
+  <!-- ============================================================ -->
   <section id="intro" class="relative overflow-hidden">
     <div class="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50"></div>
     <div class="absolute inset-0" style="background: radial-gradient(circle at 30% 50%, rgba(99,102,241,0.06) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(139,92,246,0.05) 0%, transparent 50%);"></div>
     <div class="relative max-w-4xl mx-auto px-8 py-20 lg:py-28">
-      <div class="flex items-center gap-3 mb-6">
+      <div class="flex items-center gap-3 mb-6 flex-wrap">
         <span class="badge bg-green-50 text-green-600 border border-green-200">✨ 零依赖</span>
         <span class="badge bg-blue-50 text-blue-600 border border-blue-200">🔌 框架无关</span>
         <span class="badge bg-purple-50 text-purple-600 border border-purple-200">🌊 流式渲染</span>
+        <span class="badge bg-amber-50 text-amber-600 border border-amber-200">🔄 可嵌套</span>
       </div>
       <h1 class="text-4xl lg:text-5xl font-black tracking-tight text-gray-900 mb-4">
-        自然语言驱动的<br>
-        <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Web Components</span>
+        AI 驱动的<br>
+        <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">AI Components 组件库</span>
       </h1>
-      <p class="text-lg text-gray-500 max-w-2xl mb-8 leading-relaxed">
-        用一行 <code class="bg-gray-100 px-2 py-0.5 rounded text-indigo-600 text-sm font-mono">&lt;ai-component p="..."&gt;</code> 标签，让 LLM 流式生成并实时渲染任意 HTML 片段。纯 Web Component，可在 React / Vue / Svelte / 原生 HTML 中使用。
+      <p class="text-lg text-gray-500 max-w-2xl mb-4 leading-relaxed">
+        用自然语言驱动的 Web Component 组件库。每个组件接收自然语言 prompt，调用 LLM 流式生成并实时渲染内容。
+        纯 Web Component 实现，可在 React / Vue / Svelte / 原生 HTML 中使用。
+      </p>
+      <p class="text-sm text-gray-400 max-w-2xl mb-8 leading-relaxed">
+        组件之间可以<strong class="text-indigo-500">互相引用和嵌套</strong>——LLM 生成的 HTML 中可以包含其他 AI 组件标签，甚至 <code class="bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600 text-xs font-mono">&lt;ai-component&gt;</code> 可以递归调用自己，实现分形式的 AI 生成。
       </p>
       <div class="flex gap-3 flex-wrap">
-        <a href="#quick-start" class="gen-btn inline-flex items-center gap-2">快速开始 →</a>
-        <a href="#playground" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-indigo-300 hover:text-indigo-600 transition-all">🎮 在线体验</a>
+        <a href="./guide/install.html" class="gen-btn inline-flex items-center gap-2">快速开始 →</a>
+        <a href="./components/ai-component.html#playground" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-indigo-300 hover:text-indigo-600 transition-all">🎮 在线体验</a>
       </div>
     </div>
   </section>
 
   <div class="max-w-4xl mx-auto px-8 pb-32 space-y-20">
 
-  <!-- ============================================================ -->
-  <!-- Install                                                       -->
-  <!-- ============================================================ -->
-  <section id="install">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm">📦</span>
-      安装
-    </h2>
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">npm / pnpm / yarn</div>
-        <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt"># 选择你的包管理器</span>
+    <!-- ============================================================ -->
+    <!-- Features Grid                                                 -->
+    <!-- ============================================================ -->
+    <section id="features">
+      <h2 class="text-2xl font-bold mb-8 text-center">核心特性</h2>
+      <div class="grid md:grid-cols-3 gap-5">
+        <div class="feature-card">
+          <div class="text-2xl mb-3">🧩</div>
+          <div class="font-semibold text-sm mb-2">增量 DOM 渲染</div>
+          <div class="text-xs text-gray-500 leading-relaxed">不使用 innerHTML 替换，通过 createElement / appendChild 逐步构建 DOM，避免闪烁和引用断裂。</div>
+        </div>
+        <div class="feature-card">
+          <div class="text-2xl mb-3">🌊</div>
+          <div class="font-semibold text-sm mb-2">流式缓冲解析</div>
+          <div class="text-xs text-gray-500 leading-relaxed">跨 chunk 边界的不完整 HTML 标签会被缓冲，等待后续数据完成后再处理，保证解析正确性。</div>
+        </div>
+        <div class="feature-card">
+          <div class="text-2xl mb-3">🔄</div>
+          <div class="font-semibold text-sm mb-2">递归嵌套 & 深度感知</div>
+          <div class="text-xs text-gray-500 leading-relaxed">LLM 输出中的 AI 组件标签自动触发新生成。支持最多 3 层嵌套，每层有独立的提示词策略。</div>
+        </div>
+        <div class="feature-card">
+          <div class="text-2xl mb-3">🔌</div>
+          <div class="font-semibold text-sm mb-2">框架无关</div>
+          <div class="text-xs text-gray-500 leading-relaxed">纯 Web Component 实现，可在 React、Vue、Svelte、Angular 或原生 HTML 中使用，零适配成本。</div>
+        </div>
+        <div class="feature-card">
+          <div class="text-2xl mb-3">✨</div>
+          <div class="font-semibold text-sm mb-2">零运行时依赖</div>
+          <div class="text-xs text-gray-500 leading-relaxed">完全无第三方依赖。IIFE 压缩后仅 ~8 KB，支持 tree-shaking 的 ESM 产物。</div>
+        </div>
+        <div class="feature-card">
+          <div class="text-2xl mb-3">🛡️</div>
+          <div class="font-semibold text-sm mb-2">完整的错误处理</div>
+          <div class="text-xs text-gray-500 leading-relaxed">每个组件独立捕获错误，不影响父子组件。支持 AbortController 中断和友好的错误展示。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Quick Start Preview                                           -->
+    <!-- ============================================================ -->
+    <section id="quick-start-preview">
+      <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">⚡</span>
+        快速上手
+      </h2>
+      <div class="grid md:grid-cols-2 gap-4 mb-6">
+        <div>
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">1. 安装</div>
+          <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt"># 选择你的包管理器</span>
 npm install ai-components
-pnpm add ai-components
-yarn add ai-components</pre>
-      </div>
-      <div>
-        <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">CDN（&lt;script&gt; 标签）</div>
-        <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="str">"https://unpkg.com/ai-components/dist/ai-components.iife.global.js"</span><span class="tag">&gt;&lt;/script&gt;</span></pre>
-      </div>
-    </div>
-    <div class="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-      <strong>💡 提示：</strong>IIFE 产物会自动注册 <code class="font-mono">AIC</code> 全局变量并调用 <code class="font-mono">defineAIComponent()</code>，你只需 <code class="font-mono">AIC.configure()</code> 即可使用。
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- Quick Start                                                   -->
-  <!-- ============================================================ -->
-  <section id="quick-start">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">⚡</span>
-      快速开始
-    </h2>
-
-    <div class="space-y-6">
-      <!-- ESM -->
-      <div>
-        <h3 class="font-semibold text-base mb-3 flex items-center gap-2">
-          <span class="badge bg-blue-50 text-blue-600">推荐</span>
-          方式一：ESM 模块
-        </h3>
-        <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { configure, defineAIComponent } <span class="kw">from</span> <span class="str">'ai-components'</span>;
-
-<span class="cmt">// 1. 提供 LLM 请求函数（必须返回 AsyncIterable&lt;string&gt;）</span>
-<span class="fn">configure</span>({
-  <span class="attr">request</span>: <span class="kw">async function*</span>(<span class="attr">prompt</span>, <span class="attr">options</span>) {
-    <span class="cmt">// 调用你的 LLM API，逐 chunk yield 文本</span>
-    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/chat'</span>, {
-      method: <span class="str">'POST'</span>,
-      body: JSON.<span class="fn">stringify</span>({ prompt }),
-      signal: options?.signal,
-    });
-    <span class="kw">const</span> reader = res.body.<span class="fn">getReader</span>();
-    <span class="cmt">// ...解析 SSE 并 yield content</span>
-  }
-});
-
-<span class="cmt">// 2. 注册 &lt;ai-component&gt; 自定义元素</span>
-<span class="fn">defineAIComponent</span>();</pre>
-      </div>
-
-      <!-- Script tag -->
-      <div>
-        <h3 class="font-semibold text-base mb-3">方式二：&lt;script&gt; 标签</h3>
-        <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="str">"ai-components/dist/ai-components.iife.global.js"</span><span class="tag">&gt;&lt;/script&gt;</span>
-<span class="tag">&lt;script&gt;</span>
-  AIC.<span class="fn">configure</span>({ <span class="attr">request</span>: yourRequestFn });
-<span class="tag">&lt;/script&gt;</span></pre>
-      </div>
-
-      <!-- Usage in HTML -->
-      <div>
-        <h3 class="font-semibold text-base mb-3">然后在 HTML 中使用</h3>
-        <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">&lt;!-- 只需设置 p 属性，组件会自动调用 LLM 并流式渲染 --&gt;</span>
-<span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"生成一个精美的用户注册表单"</span><span class="tag">&gt;&lt;/ai-component&gt;</span>
-
-<span class="cmt">&lt;!-- 更新 p 属性会自动重新生成 --&gt;</span>
-<span class="tag">&lt;ai-component</span> <span class="attr">p</span>=<span class="str">"一个天气预报卡片"</span><span class="tag">&gt;&lt;/ai-component&gt;</span></pre>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- Architecture                                                  -->
-  <!-- ============================================================ -->
-  <section id="architecture">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-sm">🏗️</span>
-      架构原理
-    </h2>
-
-    <div class="p-6 bg-white rounded-2xl border border-gray-200 space-y-4">
-      <!-- Flow diagram -->
-      <div class="flex flex-col items-center gap-3">
-        <div class="arch-box w-full max-w-md border-indigo-200 bg-indigo-50">
-          <div class="text-xs text-indigo-400 mb-1">宿主应用</div>
-          <div class="font-semibold text-indigo-700">configure({ request: fn })</div>
-          <div class="text-xs text-indigo-400 mt-1">提供 LLM 请求函数（OpenAI 兼容 / 自定义）</div>
+pnpm add ai-components</pre>
         </div>
-        <div class="arch-arrow">↓</div>
-        <div class="arch-box w-full max-w-md border-purple-200 bg-purple-50">
-          <div class="text-xs text-purple-400 mb-1">ai-component 组件</div>
-          <div class="font-semibold text-purple-700">&lt;ai-component p="用户 prompt"&gt;</div>
-          <div class="text-xs text-purple-400 mt-1">connectedCallback → streamLLM() → 流式获取 HTML 文本</div>
-        </div>
-        <div class="arch-arrow">↓</div>
-        <div class="arch-box w-full max-w-md border-emerald-200 bg-emerald-50">
-          <div class="text-xs text-emerald-400 mb-1">核心引擎</div>
-          <div class="font-semibold text-emerald-700">IncrementalDOMBuilder</div>
-          <div class="text-xs text-emerald-400 mt-1">createElement / appendChild — 无 innerHTML，无闪烁</div>
-        </div>
-        <div class="arch-arrow">↓</div>
-        <div class="arch-box w-full max-w-md border-amber-200 bg-amber-50">
-          <div class="text-xs text-amber-400 mb-1">最终输出</div>
-          <div class="font-semibold text-amber-700">实时渲染的 DOM 节点树</div>
-          <div class="text-xs text-amber-400 mt-1">逐 token 构建，已渲染节点保持引用稳定</div>
+        <div>
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">2. 使用</div>
+          <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="tag">&lt;ai-component</span>
+  <span class="attr">p</span>=<span class="str">"生成一个用户注册表单"</span>
+<span class="tag">&gt;&lt;/ai-component&gt;</span></pre>
         </div>
       </div>
-    </div>
-
-    <div class="mt-6 grid md:grid-cols-3 gap-4">
-      <div class="p-4 bg-white rounded-xl border border-gray-200">
-        <div class="text-lg mb-2">🧩</div>
-        <div class="font-semibold text-sm mb-1">增量 DOM</div>
-        <div class="text-xs text-gray-500">不使用 innerHTML 替换，通过 createElement / appendChild 逐步构建，避免闪烁和 DOM 引用断裂</div>
+      <div class="text-center">
+        <a href="./guide/install.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">查看完整安装指南 →</a>
       </div>
-      <div class="p-4 bg-white rounded-xl border border-gray-200">
-        <div class="text-lg mb-2">🔄</div>
-        <div class="font-semibold text-sm mb-1">流式缓冲</div>
-        <div class="text-xs text-gray-500">跨 chunk 边界的不完整 HTML 标签会被缓冲，等待后续数据完成后再处理，保证解析正确性</div>
-      </div>
-      <div class="p-4 bg-white rounded-xl border border-gray-200">
-        <div class="text-lg mb-2">🛡️</div>
-        <div class="font-semibold text-sm mb-1">容错解析</div>
-        <div class="text-xs text-gray-500">自动处理 LLM 输出的 markdown 围栏、未闭合标签、不匹配的闭合标签，以及自闭合 void 元素</div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ============================================================ -->
-  <!-- Configure                                                     -->
-  <!-- ============================================================ -->
-  <section id="configure">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center text-sm">🔧</span>
-      配置 LLM
-    </h2>
-    <p class="text-gray-500 mb-4 text-sm leading-relaxed">
-      <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">configure()</code> 是使用组件前的必要步骤。你需要提供一个
-      <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">LLMRequestFn</code>，它接收 prompt 和 options，返回 <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">AsyncIterable&lt;string&gt;</code>。
-    </p>
-    <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">type</span> LLMRequestFn = (
-  prompt: <span class="str">string</span>,
-  options?: { signal?: AbortSignal; systemPrompt?: <span class="str">string</span> }
-) =&gt; AsyncIterable&lt;<span class="str">string</span>&gt;;
+    <!-- ============================================================ -->
+    <!-- Page Navigation Cards                                         -->
+    <!-- ============================================================ -->
+    <section id="explore">
+      <h2 class="text-2xl font-bold mb-8 text-center">探索文档</h2>
+      <div class="grid md:grid-cols-2 gap-6">
 
-<span class="cmt">// 示例：接入 OpenAI 兼容 API</span>
-<span class="kw">async function*</span> <span class="fn">openaiRequest</span>(prompt, options) {
-  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'https://api.openai.com/v1/chat/completions'</span>, {
-    method: <span class="str">'POST'</span>,
-    headers: {
-      <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>,
-      <span class="str">'Authorization'</span>: <span class="str">`Bearer ${API_KEY}`</span>,
-    },
-    body: JSON.<span class="fn">stringify</span>({
-      model: <span class="str">'gpt-4o'</span>,
-      messages: [
-        { role: <span class="str">'system'</span>, content: options?.systemPrompt || <span class="str">''</span> },
-        { role: <span class="str">'user'</span>, content: prompt },
-      ],
-      stream: <span class="kw">true</span>,
-    }),
-    signal: options?.signal,
-  });
-
-  <span class="cmt">// 解析 SSE 流...</span>
-  <span class="kw">const</span> reader = res.body.<span class="fn">getReader</span>();
-  <span class="cmt">// ... yield 每个 delta.content</span>
-}
-
-<span class="fn">configure</span>({ request: openaiRequest });</pre>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- Component Usage                                               -->
-  <!-- ============================================================ -->
-  <section id="component">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center text-sm">🏷️</span>
-      &lt;ai-component&gt; 组件
-    </h2>
-
-    <div class="overflow-x-auto rounded-xl border border-gray-200">
-      <table class="api-table">
-        <thead>
-          <tr>
-            <th>属性</th>
-            <th>类型</th>
-            <th>说明</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>p</code></td>
-            <td><code>string</code></td>
-            <td><strong>必填。</strong>自然语言提示词。设置后组件自动调用 LLM 并流式渲染结果。修改后重新生成。</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h3 class="font-semibold mt-8 mb-3">生命周期</h3>
-    <div class="space-y-2 text-sm text-gray-600">
-      <div class="flex gap-3 items-start p-3 bg-white rounded-lg border border-gray-100">
-        <span class="badge bg-green-50 text-green-600 shrink-0 mt-0.5">connected</span>
-        <span>组件挂载时读取 <code class="font-mono text-indigo-600">p</code> 属性，自动开始生成。先显示加载态（spinner + prompt 预览），流开始后切换到内容模式。</span>
-      </div>
-      <div class="flex gap-3 items-start p-3 bg-white rounded-lg border border-gray-100">
-        <span class="badge bg-amber-50 text-amber-600 shrink-0 mt-0.5">attribute</span>
-        <span><code class="font-mono text-indigo-600">p</code> 属性变化时，取消当前生成并重新执行。</span>
-      </div>
-      <div class="flex gap-3 items-start p-3 bg-white rounded-lg border border-gray-100">
-        <span class="badge bg-red-50 text-red-600 shrink-0 mt-0.5">disconnected</span>
-        <span>从 DOM 移除时自动取消正在进行的生成（通过 AbortController）。</span>
-      </div>
-    </div>
-
-    <h3 class="font-semibold mt-8 mb-3">动态创建</h3>
-    <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">const</span> el = document.<span class="fn">createElement</span>(<span class="str">'ai-component'</span>);
-el.<span class="fn">setAttribute</span>(<span class="str">'p'</span>, <span class="str">'生成一个天气卡片'</span>);
-document.body.<span class="fn">appendChild</span>(el);
-
-<span class="cmt">// 更新 prompt → 自动重新生成</span>
-el.<span class="fn">setAttribute</span>(<span class="str">'p'</span>, <span class="str">'生成一个用户资料卡'</span>);
-
-<span class="cmt">// 移除 → 自动取消生成</span>
-el.<span class="fn">remove</span>();</pre>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- API Reference                                                 -->
-  <!-- ============================================================ -->
-  <section id="api-configure">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">📖</span>
-      API 参考
-    </h2>
-
-    <!-- configure -->
-    <div class="mb-10">
-      <h3 class="font-bold text-lg mb-3 font-mono text-indigo-700">configure(config)</h3>
-      <p class="text-sm text-gray-500 mb-3">设置全局 LLM 请求函数。<strong>必须在任何 <code>&lt;ai-component&gt;</code> 连接之前调用。</strong></p>
-      <div class="overflow-x-auto rounded-xl border border-gray-200">
-        <table class="api-table">
-          <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
-          <tbody>
-            <tr>
-              <td><code>config.request</code></td>
-              <td><code>LLMRequestFn</code></td>
-              <td><strong>必填。</strong>LLM 请求函数，必须返回 <code>AsyncIterable&lt;string&gt;</code></td>
-            </tr>
-            <tr>
-              <td><code>config.systemPrompt</code></td>
-              <td><code>string?</code></td>
-              <td>自定义系统提示词，覆盖内置默认值</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- defineAIComponent -->
-  <section id="api-define" class="mb-10">
-    <h3 class="font-bold text-lg mb-3 font-mono text-indigo-700">defineAIComponent()</h3>
-    <p class="text-sm text-gray-500 mb-3">
-      注册 <code>&lt;ai-component&gt;</code> 自定义元素到 <code>customElements</code>。防止重复注册。使用 IIFE 产物时会自动调用。
-    </p>
-    <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { defineAIComponent } <span class="kw">from</span> <span class="str">'ai-components'</span>;
-<span class="fn">defineAIComponent</span>();  <span class="cmt">// 只需调用一次</span></pre>
-  </section>
-
-  <!-- streamLLM -->
-  <section id="api-stream" class="mb-10">
-    <h3 class="font-bold text-lg mb-3 font-mono text-indigo-700">streamLLM(prompt, signal?)</h3>
-    <p class="text-sm text-gray-500 mb-3">
-      底层流式生成函数。返回 <code>AsyncGenerator&lt;string&gt;</code>，逐 chunk yield LLM 输出文本。可脱离组件独立使用。
-    </p>
-    <div class="overflow-x-auto rounded-xl border border-gray-200 mb-4">
-      <table class="api-table">
-        <thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td><code>prompt</code></td><td><code>string</code></td><td>用户提示词</td></tr>
-          <tr><td><code>signal</code></td><td><code>AbortSignal?</code></td><td>中断信号，每次 yield 前检查</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { streamLLM } <span class="kw">from</span> <span class="str">'ai-components'</span>;
-
-<span class="kw">const</span> ctrl = <span class="kw">new</span> AbortController();
-<span class="kw">for await</span> (<span class="kw">const</span> chunk <span class="kw">of</span> <span class="fn">streamLLM</span>(<span class="str">'写一首诗'</span>, ctrl.signal)) {
-  console.<span class="fn">log</span>(chunk);
-}
-<span class="cmt">// ctrl.abort() 可随时中断</span></pre>
-  </section>
-
-  <!-- IncrementalDOMBuilder -->
-  <section id="api-dom-builder" class="mb-10">
-    <h3 class="font-bold text-lg mb-3 font-mono text-indigo-700">IncrementalDOMBuilder</h3>
-    <p class="text-sm text-gray-500 mb-3">
-      核心增量 DOM 构建引擎。接收流式 HTML 文本块，通过 <code>createElement</code> / <code>appendChild</code> 逐步构建 DOM 节点。也可独立使用。
-    </p>
-    <div class="overflow-x-auto rounded-xl border border-gray-200 mb-4">
-      <table class="api-table">
-        <thead><tr><th>方法</th><th>签名</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr>
-            <td><code>constructor</code></td>
-            <td><code>new (root: HTMLElement)</code></td>
-            <td>创建构建器，指定根容器元素</td>
-          </tr>
-          <tr>
-            <td><code>write</code></td>
-            <td><code>(chunk: string) => void</code></td>
-            <td>输入一块 HTML 文本，完整标签立即构建 DOM，不完整标签缓冲等待</td>
-          </tr>
-          <tr>
-            <td><code>finish</code></td>
-            <td><code>() => void</code></td>
-            <td>结束构建：刷新缓冲区，自动关闭所有未闭合标签。之后 <code>write()</code> 为空操作</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="kw">import</span> { IncrementalDOMBuilder } <span class="kw">from</span> <span class="str">'ai-components'</span>;
-
-<span class="kw">const</span> root = document.<span class="fn">getElementById</span>(<span class="str">'container'</span>);
-<span class="kw">const</span> builder = <span class="kw">new</span> <span class="fn">IncrementalDOMBuilder</span>(root);
-
-<span class="cmt">// 模拟流式输入</span>
-builder.<span class="fn">write</span>(<span class="str">'&lt;div class="card"&gt;'</span>);
-builder.<span class="fn">write</span>(<span class="str">'&lt;h2&gt;Hello&lt;/h2&gt;'</span>);
-builder.<span class="fn">write</span>(<span class="str">'&lt;p&gt;World&lt;/p&gt;'</span>);
-builder.<span class="fn">write</span>(<span class="str">'&lt;/div&gt;'</span>);
-builder.<span class="fn">finish</span>();</pre>
-  </section>
-
-  <!-- Types -->
-  <section id="api-types" class="mb-10">
-    <h3 class="font-bold text-lg mb-3 font-mono text-indigo-700">类型定义</h3>
-    <pre class="code-block"><button class="copy-btn" onclick="copyCode(this)">复制</button><span class="cmt">/** LLM 请求函数签名 */</span>
-<span class="kw">type</span> LLMRequestFn = (
-  prompt: <span class="str">string</span>,
-  options?: LLMRequestOptions,
-) =&gt; AsyncIterable&lt;<span class="str">string</span>&gt;;
-
-<span class="cmt">/** 请求选项 */</span>
-<span class="kw">interface</span> LLMRequestOptions {
-  signal?: AbortSignal;       <span class="cmt">// 中断信号</span>
-  systemPrompt?: <span class="str">string</span>;      <span class="cmt">// 系统提示词</span>
-}
-
-<span class="cmt">/** 全局配置 */</span>
-<span class="kw">interface</span> AIComponentsConfig {
-  request: LLMRequestFn;      <span class="cmt">// 必填 — LLM 请求函数</span>
-  systemPrompt?: <span class="str">string</span>;      <span class="cmt">// 自定义系统提示词</span>
-}</pre>
-
-    <h4 class="font-semibold mt-6 mb-2 text-sm">辅助函数</h4>
-    <div class="overflow-x-auto rounded-xl border border-gray-200">
-      <table class="api-table">
-        <thead><tr><th>函数</th><th>返回值</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td><code>getConfig()</code></td><td><code>AIComponentsConfig | null</code></td><td>获取当前配置</td></tr>
-          <tr><td><code>getRequestFn()</code></td><td><code>LLMRequestFn</code></td><td>获取请求函数，未配置则抛出错误</td></tr>
-          <tr><td><code>getSystemPrompt()</code></td><td><code>string</code></td><td>获取当前系统提示词</td></tr>
-          <tr><td><code>parseTag(tagStr)</code></td><td><code>ParsedToken | null</code></td><td>解析 HTML 标签字符串</td></tr>
-          <tr><td><code>parseAttributes(attrStr)</code></td><td><code>Record&lt;string, string&gt;</code></td><td>解析属性字符串</td></tr>
-          <tr><td><code>buildPrompt(prompt)</code></td><td><code>string</code></td><td>构建最终 prompt（预留扩展点）</td></tr>
-          <tr><td><code>SYSTEM_PROMPT</code></td><td><code>string</code></td><td>内置系统提示词常量</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- System Prompt                                                 -->
-  <!-- ============================================================ -->
-  <section id="system-prompt">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center text-sm">💬</span>
-      系统提示词
-    </h2>
-    <p class="text-sm text-gray-500 mb-4 leading-relaxed">
-      组件内置了一个经过优化的系统提示词，指导 LLM 输出适合流式渲染的 HTML 片段。你也可以通过 <code class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600">configure({ systemPrompt })</code> 覆盖。
-    </p>
-    <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 leading-relaxed space-y-2">
-      <div>📋 <strong>核心规则：</strong></div>
-      <ul class="list-disc list-inside space-y-1 text-xs text-slate-600 ml-4">
-        <li>只输出 HTML 片段，不要 <code>&lt;!DOCTYPE&gt;</code>、<code>&lt;html&gt;</code>、<code>&lt;head&gt;</code>、<code>&lt;body&gt;</code></li>
-        <li>使用 Tailwind CSS 类名（假设父页面已加载 CDN）</li>
-        <li>响应式布局、视觉精美、语义化 HTML</li>
-        <li><strong>禁止入场动画</strong>（流式渲染会导致动画重复触发闪烁）</li>
-        <li>允许 hover 过渡和持续环境动画</li>
-        <li>允许 ≤20 行的内联 <code>&lt;script&gt;</code>（必须用 <code>var</code>）</li>
-        <li>不输出 markdown 围栏</li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- Error Handling                                                -->
-  <!-- ============================================================ -->
-  <section id="error-handling">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-sm">🚨</span>
-      错误处理
-    </h2>
-    <div class="space-y-3">
-      <div class="p-4 bg-white rounded-xl border border-gray-200">
-        <div class="font-semibold text-sm mb-1">未配置 request 函数</div>
-        <div class="text-xs text-gray-500">组件显示红色错误边框和提示文字。控制台抛出 <code>[ai-components] LLM request function not configured</code>。</div>
-      </div>
-      <div class="p-4 bg-white rounded-xl border border-gray-200">
-        <div class="font-semibold text-sm mb-1">API 请求失败</div>
-        <div class="text-xs text-gray-500">request 函数抛出的错误会被捕获，组件切换到错误状态并显示 error.message。</div>
-      </div>
-      <div class="p-4 bg-white rounded-xl border border-gray-200">
-        <div class="font-semibold text-sm mb-1">LLM 未返回内容</div>
-        <div class="text-xs text-gray-500">如果流结束但没有收到任何 HTML 标签，显示 "No content generated" 空状态。</div>
-      </div>
-      <div class="p-4 bg-white rounded-xl border border-gray-200">
-        <div class="font-semibold text-sm mb-1">用户中断</div>
-        <div class="text-xs text-gray-500">通过 AbortController 中断生成时，组件保留已渲染的内容不清除。</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- Bundle Size                                                   -->
-  <!-- ============================================================ -->
-  <section id="bundle-size">
-    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center text-sm">📊</span>
-      产物 & 体积
-    </h2>
-    <div class="overflow-x-auto rounded-xl border border-gray-200">
-      <table class="api-table">
-        <thead><tr><th>文件</th><th>格式</th><th>体积</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td><code>ai-components.js</code></td><td>ESM</td><td>~12 KB</td><td>ES Module，支持 tree-shaking</td></tr>
-          <tr><td><code>ai-components.cjs</code></td><td>CJS</td><td>~14 KB</td><td>CommonJS，Node.js 兼容</td></tr>
-          <tr><td><code>ai-components.iife.global.js</code></td><td>IIFE</td><td>~8 KB</td><td>压缩产物，全局变量 <code>AIC</code>，可直接 &lt;script&gt; 引入</td></tr>
-          <tr><td><code>index.d.ts</code></td><td>TypeScript</td><td>~5 KB</td><td>完整类型声明</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="mt-3 text-xs text-gray-400">
-      运行时零依赖。devDependencies 仅包含 tsup、TypeScript、vitest。<code>sideEffects: false</code> 支持 tree-shaking。
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- Playground                                                    -->
-  <!-- ============================================================ -->
-  <section id="playground">
-    <h2 class="text-2xl font-bold mb-2 flex items-center gap-2">
-      <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm">🎮</span>
-      Playground
-    </h2>
-    <p class="text-sm text-gray-500 mb-6">配置你的 LLM API，然后输入 prompt 体验实时流式生成。</p>
-
-    <!-- Config panel -->
-    <div class="rounded-2xl overflow-hidden mb-6" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);">
-      <div class="px-5 py-4">
-        <div class="flex items-center gap-2 mb-3">
-          <span class="text-white text-sm font-semibold">API 配置</span>
-          <div class="ml-auto flex items-center gap-2 text-xs text-indigo-300">
-            <span class="w-2 h-2 rounded-full" id="statusDot" style="background:#ef4444;"></span>
-            <span id="statusText">未配置</span>
+        <a href="./guide/install.html" class="page-card group">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center text-lg">📦</span>
+            <div>
+              <div class="font-bold text-base group-hover:text-indigo-600 transition-colors">安装指南</div>
+              <div class="text-xs text-gray-400">npm / CDN / 快速配置</div>
+            </div>
           </div>
-        </div>
-        <!-- Presets -->
-        <div class="flex gap-2 mb-3 flex-wrap" id="presetContainer"></div>
-        <!-- Fields -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label class="text-indigo-300/60 text-[11px] mb-1 block">API Key</label>
-            <input type="password" id="apiKey" class="config-input w-full" placeholder="sk-..." />
-          </div>
-          <div>
-            <label class="text-indigo-300/60 text-[11px] mb-1 block">Base URL</label>
-            <input type="text" id="baseUrl" class="config-input w-full" placeholder="https://api.openai.com/v1" />
-          </div>
-          <div>
-            <label class="text-indigo-300/60 text-[11px] mb-1 block">Model</label>
-            <input type="text" id="model" class="config-input w-full" placeholder="gpt-4o" />
-          </div>
-        </div>
-      </div>
-    </div>
+          <p class="text-sm text-gray-500">了解如何安装组件库并配置 LLM 请求函数，几分钟内即可开始使用。</p>
+        </a>
 
-    <!-- Examples -->
-    <div class="mb-4">
-      <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">示例 Prompt</div>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="examplesGrid">
-        <div class="example-card" data-prompt="一个精美的用户资料卡片，包含头像、姓名、职位、简介和社交链接（GitHub、Twitter）">
-          <div class="text-lg mb-1">👤</div>
-          <div class="font-semibold text-sm">用户卡片</div>
-          <div class="text-xs text-gray-400 mt-1">头像 + 社交链接</div>
-        </div>
-        <div class="example-card" data-prompt="一个天气预报组件，显示今天和未来 4 天的天气，用 emoji 图标表示天气状况，包含温度、风力信息">
-          <div class="text-lg mb-1">🌤</div>
-          <div class="font-semibold text-sm">天气预报</div>
-          <div class="text-xs text-gray-400 mt-1">5 天天气预报</div>
-        </div>
-        <div class="example-card" data-prompt="一个 SaaS 产品定价表，3 个套餐（Starter $9/mo、Pro $29/mo、Enterprise 自定义），包含功能对比列表和 CTA 按钮">
-          <div class="text-lg mb-1">💰</div>
-          <div class="font-semibold text-sm">定价表</div>
-          <div class="text-xs text-gray-400 mt-1">3 个套餐对比</div>
-        </div>
-        <div class="example-card" data-prompt="一个 Kanban 看板，三列：待办、进行中、已完成，每列 2-3 个任务卡片，卡片包含标题、标签和指派人头像">
-          <div class="text-lg mb-1">📋</div>
-          <div class="font-semibold text-sm">看板</div>
-          <div class="text-xs text-gray-400 mt-1">Kanban 任务管理</div>
-        </div>
-        <div class="example-card" data-prompt="a beautiful music player UI with album artwork, song title, artist name, progress bar, play/pause/skip controls, and a mini playlist">
-          <div class="text-lg mb-1">🎵</div>
-          <div class="font-semibold text-sm">音乐播放器</div>
-          <div class="text-xs text-gray-400 mt-1">专辑封面 + 控制栏</div>
-        </div>
-        <div class="example-card" data-prompt="a modern login page with email/password fields, 'Remember me' checkbox, 'Forgot password' link, Google and GitHub social login buttons, gradient purple background">
-          <div class="text-lg mb-1">🔐</div>
-          <div class="font-semibold text-sm">登录页</div>
-          <div class="text-xs text-gray-400 mt-1">社交登录 + 渐变背景</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Prompt input + generate -->
-    <div class="flex gap-3 mb-4">
-      <textarea id="promptInput" class="prompt-input flex-1" rows="2" placeholder="输入自然语言 prompt，例如：一个电商商品详情页..."></textarea>
-      <div class="flex flex-col gap-2">
-        <button class="gen-btn flex-1 text-sm" id="genBtn" onclick="generate()">🚀 生成</button>
-        <button class="gen-btn danger flex-1 text-sm" id="stopBtn" style="display:none;" onclick="stopGeneration()">⏹ 停止</button>
-      </div>
-    </div>
-    <div class="text-xs text-gray-400 mb-4">按 <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Ctrl</kbd> + <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Enter</kbd> 快速生成</div>
-
-    <!-- Output -->
-    <div class="output-frame">
-      <div class="output-frame-header">
-        <div class="output-dot" style="background:#ef4444;"></div>
-        <div class="output-dot" style="background:#f59e0b;"></div>
-        <div class="output-dot" style="background:#22c55e;"></div>
-        <span class="text-xs text-gray-400 ml-2">OUTPUT</span>
-        <button class="ml-auto text-xs text-gray-400 hover:text-red-400 transition-colors" onclick="clearOutput()">清空</button>
-      </div>
-      <div class="p-5 overflow-auto" id="output" style="min-height: 200px;">
-        <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
-          <div class="text-center">
-            <div class="text-3xl mb-2">✨</div>
-            <div>选择一个示例或输入 prompt，<br>AI 组件将在这里实时渲染</div>
+        <a href="./guide/architecture.html" class="page-card group">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-lg">🏗️</span>
+            <div>
+              <div class="font-bold text-base group-hover:text-indigo-600 transition-colors">架构原理</div>
+              <div class="text-xs text-gray-400">增量 DOM / 流式渲染 / 嵌套机制</div>
+            </div>
           </div>
-        </div>
+          <p class="text-sm text-gray-500">深入理解组件库的内部工作原理，包括增量 DOM 构建、流式缓冲和递归嵌套机制。</p>
+        </a>
+
+        <a href="./components/ai-component.html" class="page-card group">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-10 h-10 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center text-lg">🏷️</span>
+            <div>
+              <div class="font-bold text-base group-hover:text-indigo-600 transition-colors">&lt;ai-component&gt;</div>
+              <div class="text-xs text-gray-400">属性 / 生命周期 / Playground</div>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500">通用 AI 组件的完整文档，包含属性说明、生命周期、嵌套示例和在线 Playground。</p>
+        </a>
+
+        <a href="./api/index.html" class="page-card group">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-lg">📖</span>
+            <div>
+              <div class="font-bold text-base group-hover:text-indigo-600 transition-colors">API 参考</div>
+              <div class="text-xs text-gray-400">configure / streamLLM / 类型定义</div>
+            </div>
+          </div>
+          <p class="text-sm text-gray-500">所有导出函数、类和类型的完整 API 文档，包含签名、参数说明和使用示例。</p>
+        </a>
+
       </div>
-    </div>
-  </section>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- Components Preview                                            -->
+    <!-- ============================================================ -->
+    <section id="components-preview">
+      <h2 class="text-2xl font-bold mb-6 text-center">组件一览</h2>
+      <div class="grid md:grid-cols-2 gap-5">
+
+        <a href="./components/ai-component.html" class="page-card group">
+          <div class="flex items-center gap-3 mb-3">
+            <code class="text-indigo-600 font-mono font-bold text-sm">&lt;ai-component&gt;</code>
+            <span class="badge bg-green-50 text-green-600 border border-green-200">可用</span>
+          </div>
+          <p class="text-xs text-gray-500">通用 AI 组件。接受任意自然语言 prompt，流式生成并渲染 HTML 片段。支持递归嵌套和深度感知。</p>
+        </a>
+
+        <div class="page-card opacity-50 cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <code class="text-gray-400 font-mono font-bold text-sm">&lt;wc-table&gt;</code>
+            <span class="badge bg-gray-100 text-gray-400 border border-gray-200">开发中</span>
+          </div>
+          <p class="text-xs text-gray-400">AI 驱动的数据表格组件。</p>
+        </div>
+
+        <div class="page-card opacity-50 cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <code class="text-gray-400 font-mono font-bold text-sm">&lt;wc-card&gt;</code>
+            <span class="badge bg-gray-100 text-gray-400 border border-gray-200">开发中</span>
+          </div>
+          <p class="text-xs text-gray-400">AI 驱动的卡片内容组件。</p>
+        </div>
+
+        <div class="page-card opacity-50 cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <code class="text-gray-400 font-mono font-bold text-sm">&lt;wc-chart&gt;</code>
+            <span class="badge bg-gray-100 text-gray-400 border border-gray-200">开发中</span>
+          </div>
+          <p class="text-xs text-gray-400">AI 驱动的图表可视化组件。</p>
+        </div>
+
+      </div>
+    </section>
 
   </div><!-- max-w-4xl -->
 </main>
@@ -814,247 +229,9 @@ builder.<span class="fn">finish</span>();</pre>
 <!-- Scripts                                                        -->
 <!-- ============================================================ -->
 <script type="module">
-  import { configure, defineAIComponent } from '../dist/ai-components.js';
-
-  // ============================================================
-  // Provider presets
-  // ============================================================
-  const PRESETS = [
-    { id: 'openai',     name: 'OpenAI',            icon: '🟢', baseUrl: 'https://api.openai.com/v1',                                     defaultModel: 'gpt-4o' },
-    { id: 'deepseek',   name: 'DeepSeek',           icon: '🐋', baseUrl: 'https://api.deepseek.com',                                      defaultModel: 'deepseek-v4-flash' },
-    { id: 'claude',     name: 'Claude (OpenRouter)', icon: '🔮', baseUrl: 'https://openrouter.ai/api/v1',                                  defaultModel: 'anthropic/claude-sonnet-4' },
-    { id: 'gemini',     name: 'Gemini',             icon: '💎', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',        defaultModel: 'gemini-2.5-flash' },
-    { id: 'qwen',       name: 'Qwen',              icon: '☁️', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',              defaultModel: 'qwen-plus' },
-  ];
-
-  const STORAGE_KEY = 'aic_doc_config';
-
-  // ============================================================
-  // Config persistence
-  // ============================================================
-  function loadConfig() {
-    try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {}; }
-    catch { return {}; }
-  }
-  function saveConfig(cfg) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
-
-  function applyConfig() {
-    const cfg = loadConfig();
-    document.getElementById('apiKey').value  = cfg.apiKey  || '';
-    document.getElementById('baseUrl').value = cfg.baseUrl || 'https://api.openai.com/v1';
-    document.getElementById('model').value   = cfg.model   || 'gpt-4o';
-    updateStatus();
-    highlightPreset(cfg.provider || '');
-  }
-
-  function readFormConfig() {
-    return {
-      apiKey:  document.getElementById('apiKey').value.trim(),
-      baseUrl: document.getElementById('baseUrl').value.trim(),
-      model:   document.getElementById('model').value.trim(),
-    };
-  }
-
-  function updateStatus() {
-    const dot  = document.getElementById('statusDot');
-    const text = document.getElementById('statusText');
-    const key  = document.getElementById('apiKey').value.trim();
-    dot.style.background = key ? '#22c55e' : '#ef4444';
-    text.textContent     = key ? '已配置' : '需要 API Key';
-  }
-
-  function persistConfig(extra = {}) {
-    saveConfig({ ...loadConfig(), ...readFormConfig(), ...extra });
-    updateStatus();
-  }
-
-  // ============================================================
-  // Presets
-  // ============================================================
-  function renderPresets() {
-    const container = document.getElementById('presetContainer');
-    PRESETS.forEach(p => {
-      const el = document.createElement('div');
-      el.className = 'preset-chip';
-      el.dataset.id = p.id;
-      el.textContent = `${p.icon} ${p.name}`;
-      el.onclick = () => {
-        document.getElementById('baseUrl').value = p.baseUrl;
-        document.getElementById('model').value   = p.defaultModel;
-        highlightPreset(p.id);
-        persistConfig({ provider: p.id });
-      };
-      container.appendChild(el);
-    });
-  }
-
-  function highlightPreset(id) {
-    document.querySelectorAll('.preset-chip').forEach(el =>
-      el.classList.toggle('active', el.dataset.id === id)
-    );
-  }
-
-  // ============================================================
-  // OpenAI-compatible streaming request
-  // ============================================================
-  async function* openaiRequest(prompt, options = {}) {
-    const cfg = readFormConfig();
-    if (!cfg.apiKey) throw new Error('请先在上方配置 API Key');
-
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: cfg.model || 'gpt-4o',
-        messages: [
-          { role: 'system', content: options.systemPrompt || '' },
-          { role: 'user',   content: prompt },
-        ],
-        temperature: 0.85,
-        max_tokens: 4096,
-        stream: true,
-      }),
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`API Error ${res.status}: ${err}`);
-    }
-
-    const reader  = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer    = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') return;
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) yield content;
-        } catch {}
-      }
-    }
-  }
-
-  // ============================================================
-  // Init
-  // ============================================================
-  configure({ request: openaiRequest });
-  defineAIComponent();
-
-  renderPresets();
-  applyConfig();
-
-  // Auto-save config on input
-  ['apiKey', 'baseUrl', 'model'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => persistConfig());
-  });
-
-  // ============================================================
-  // Generation
-  // ============================================================
-  window.generate = function() {
-    const prompt = document.getElementById('promptInput').value.trim();
-    if (!prompt) return;
-
-    const cfg = readFormConfig();
-    if (!cfg.apiKey) { alert('请先配置 API Key'); return; }
-
-    persistConfig();
-
-    const output = document.getElementById('output');
-    output.innerHTML = '';
-
-    const comp = document.createElement('ai-component');
-    comp.setAttribute('p', prompt);
-    output.appendChild(comp);
-
-    document.getElementById('genBtn').style.display  = 'none';
-    document.getElementById('stopBtn').style.display = '';
-
-    const check = setInterval(() => {
-      if (!comp._generating) {
-        clearInterval(check);
-        document.getElementById('genBtn').style.display  = '';
-        document.getElementById('stopBtn').style.display = 'none';
-      }
-    }, 300);
-  };
-
-  window.stopGeneration = function() {
-    const comp = document.getElementById('output').querySelector('ai-component');
-    if (comp) comp._cancel?.();
-    document.getElementById('genBtn').style.display  = '';
-    document.getElementById('stopBtn').style.display = 'none';
-  };
-
-  window.clearOutput = function() {
-    document.getElementById('output').innerHTML = `
-      <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
-        <div class="text-center">
-          <div class="text-3xl mb-2">✨</div>
-          <div>选择一个示例或输入 prompt，<br>AI 组件将在这里实时渲染</div>
-        </div>
-      </div>`;
-  };
-
-  // Example cards click
-  document.querySelectorAll('.example-card').forEach(card => {
-    card.addEventListener('click', () => {
-      document.getElementById('promptInput').value = card.dataset.prompt;
-      document.getElementById('promptInput').focus();
-    });
-  });
-
-  // Ctrl+Enter
-  document.getElementById('promptInput').addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      window.generate();
-    }
-  });
-
-  // ============================================================
-  // Sidebar active state
-  // ============================================================
-  const sidebarLinks = document.querySelectorAll('.sidebar a[href^="#"]');
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        sidebarLinks.forEach(a => a.classList.remove('active'));
-        const link = document.querySelector(`.sidebar a[href="#${entry.target.id}"]`);
-        if (link) link.classList.add('active');
-      }
-    });
-  }, { rootMargin: '-20% 0px -60% 0px' });
-
-  document.querySelectorAll('section[id]').forEach(sec => observer.observe(sec));
-</script>
-
-<!-- Copy code helper -->
-<script>
-  function copyCode(btn) {
-    const pre = btn.parentElement;
-    const code = pre.textContent.replace('复制', '').trim();
-    navigator.clipboard.writeText(code).then(() => {
-      btn.textContent = '已复制 ✓';
-      setTimeout(() => btn.textContent = '复制', 1500);
-    });
-  }
+  import { renderNav, copyCode } from './shared/nav.js';
+  renderNav({ currentPage: 'home', basePath: '.' });
+  window.copyCode = copyCode;
 </script>
 </body>
 </html>

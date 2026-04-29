@@ -12,7 +12,7 @@ export { AIComponent, defineAIComponent } from "./components/ai-component";
 // --- Core ---
 export { IncrementalDOMBuilder, parseTag, parseAttributes } from "./core/dom-builder";
 export { configure, getConfig, getRequestFn, getSystemPrompt, streamLLM } from "./core/stream";
-export { SYSTEM_PROMPT, buildPrompt } from "./core/prompt";
+export { SYSTEM_PROMPT, buildPrompt, getDepthAwareSystemPrompt, MAX_DEPTH } from "./core/prompt";
 
 // --- Types ---
 export type {
