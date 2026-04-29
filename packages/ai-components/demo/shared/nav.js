@@ -15,7 +15,7 @@ function escapeHTML(str) {
 export function renderNav({ currentPage = 'home', basePath = '.' } = {}) {
   // ---------- Top Nav ----------
   const nav = document.createElement('nav');
-  nav.className = 'fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200/60 h-14 flex items-center px-6';
+nav.className = 'fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg h-14 flex items-center px-6';
   nav.innerHTML = `
     <a href="${basePath}/index.html" class="flex items-center gap-3 text-inherit no-underline">
       <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">AI</div>
@@ -135,7 +135,7 @@ export function renderNav({ currentPage = 'home', basePath = '.' } = {}) {
   if (typeof items === 'string') items = SIDEBAR_ITEMS[items];
 
   const aside = document.createElement('aside');
-  aside.className = 'sidebar fixed left-0 top-14 bottom-0 w-56 border-r border-gray-200/60 bg-white/50 backdrop-blur-sm overflow-y-auto py-4 hidden lg:block';
+aside.className = 'sidebar fixed left-0 top-14 bottom-0 w-56 bg-white/50 backdrop-blur-sm overflow-y-auto py-4 hidden lg:block';
 
   let html = '';
   for (const item of items) {
@@ -169,6 +169,106 @@ export function renderNav({ currentPage = 'home', basePath = '.' } = {}) {
 
     document.querySelectorAll('section[id]').forEach(sec => observer.observe(sec));
   }
+
+  // ---------- Inject Prism.js for syntax highlighting ----------
+  injectPrism();
+}
+
+/**
+ * Inject Prism.js CSS + JS from CDN and auto-highlight all code blocks.
+ * Uses a minimal theme — our styles.css overrides the colors.
+ */
+function injectPrism() {
+  if (document.getElementById('prism-css')) return; // already injected
+
+  // Prism CSS (we override colors in styles.css, so use a minimal base)
+  const link = document.createElement('link');
+  link.id = 'prism-css';
+  link.rel = 'stylesheet';
+  link.href = 'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css';
+  document.head.appendChild(link);
+
+  // Prism JS core + common languages
+  const langs = ['markup', 'css', 'javascript', 'typescript', 'bash', 'json'];
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js';
+  script.onload = () => {
+    // Load additional language components
+    const langPromises = langs.map(lang => {
+      return new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = `https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-${lang}.min.js`;
+        s.onload = resolve;
+        s.onerror = resolve; // don't block on failure
+        document.head.appendChild(s);
+      });
+    });
+
+    Promise.all(langPromises).then(() => {
+      highlightAllCodeBlocks();
+    });
+  };
+  document.head.appendChild(script);
+}
+
+/**
+ * Auto-detect language and highlight all pre.code-block elements.
+ * Skips blocks that already have Prism tokens (manual <span> highlights).
+ */
+function highlightAllCodeBlocks() {
+  if (typeof Prism === 'undefined') return;
+
+  document.querySelectorAll('pre.code-block').forEach(pre => {
+    let code = pre.querySelector('code');
+    if (!code) {
+      // Wrap bare text in <code> if needed
+      const text = pre.textContent;
+      code = document.createElement('code');
+      // Preserve copy button
+      const copyBtn = pre.querySelector('.copy-btn');
+      code.textContent = text.replace('复制', '').trim();
+      pre.innerHTML = '';
+      pre.appendChild(code);
+      if (copyBtn) pre.appendChild(copyBtn);
+    }
+
+    // Skip if already has Prism tokens (manual <span class="token"> or legacy <span class="kw/fn/str">)
+    if (code.querySelector('.token')) return;
+    // If has legacy manual spans (kw, fn, str, etc.), skip — they already have color
+    if (code.querySelector('.kw, .fn, .str, .cmt, .tag, .attr, .num')) return;
+
+    // Auto-detect language from class or content
+    let lang = '';
+    const classMatch = code.className.match(/language-(\w+)/);
+    if (classMatch) {
+      lang = classMatch[1];
+    } else {
+      // Heuristic detection
+      const text = code.textContent;
+      if (text.includes('<ai-') || text.includes('</') || text.includes('<!')) {
+        lang = 'markup';
+      } else if (text.includes('import ') || text.includes('const ') || text.includes('function ') || text.includes('=>')) {
+        lang = 'javascript';
+      } else if (text.includes('npm ') || text.includes('pnpm ') || text.includes('yarn ')) {
+        lang = 'bash';
+      } else if (text.match(/^\s*\{/) && text.match(/\}\s*$/)) {
+        lang = 'json';
+      } else if (text.includes('ai-component[') || text.includes('{') && text.includes(':') && text.includes(';')) {
+        lang = 'css';
+      } else {
+        lang = 'markup'; // default fallback
+      }
+    }
+
+    code.className = `language-${lang}`;
+    pre.className = pre.className.replace(/\blanguage-\w+/g, '') + ` language-${lang}`;
+
+    try {
+      Prism.highlightElement(code);
+    } catch (e) {
+      // Silently fail
+    }
+  });
 }
 
 /**
