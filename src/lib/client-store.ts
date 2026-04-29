@@ -63,6 +63,29 @@ export function savePage(page: PageData): void {
   saveAllPages(pages);
 }
 
+/** Pre-save page metadata before navigation (no html yet).
+ *  Used to pass query/parentId/selectionContext via localStorage instead of URL params. */
+export function preSavePage(page: Omit<PageData, "html" | "createdAt"> & { createdAt?: number }): void {
+  const pages = getAllPages();
+
+  // Evict old pages if needed
+  const ids = Object.keys(pages);
+  if (ids.length >= MAX_PAGES) {
+    const entries = Object.entries(pages).sort(
+      ([, a], [, b]) => a.createdAt - b.createdAt
+    );
+    const toRemove = entries.slice(0, Math.floor(MAX_PAGES * 0.2));
+    toRemove.forEach(([key]) => delete pages[key]);
+  }
+
+  pages[page.id] = {
+    ...page,
+    html: "",
+    createdAt: page.createdAt ?? Date.now(),
+  };
+  saveAllPages(pages);
+}
+
 /** Get a single page from localStorage */
 export function getPage(id: string): PageData | undefined {
   const pages = getAllPages();

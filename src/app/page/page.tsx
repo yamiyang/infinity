@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { savePage, getPage as getCachedPage, clearPageHtml, buildAncestryContext } from "@/lib/client-store";
+import { savePage, getPage as getCachedPage, clearPageHtml, buildAncestryContext, preSavePage } from "@/lib/client-store";
 import { SelectionContext } from "@/types";
 import { isConfigured, getBasePath, fetchElectronConfig, isElectronConfigured } from "@/lib/config";
 import { isElectron } from "@/lib/env";
@@ -717,17 +717,15 @@ class IncrementalIframeWriter {
 
 function PageContent() {
   const searchParams = useSearchParams();
-  const query = searchParams.get("q") || "";
-  const parentId = searchParams.get("parentId") || undefined;
-  const scParam = searchParams.get("sc") || undefined;
   const pageId = searchParams.get("id") || "";
 
-  // Parse selection context from URL if present (from highlight-to-ask)
-  const urlSelectionContext: SelectionContext | undefined = (() => {
-    if (!scParam) return undefined;
-    try { return JSON.parse(scParam) as SelectionContext; }
-    catch { return undefined; }
-  })();
+  // Read page metadata from localStorage (pre-saved before navigation)
+  const cachedMeta = getCachedPage(pageId);
+  const query = cachedMeta?.query || "";
+  const parentId = cachedMeta?.parentId || undefined;
+
+  // Parse selection context from localStorage if present (from highlight-to-ask)
+  const urlSelectionContext: SelectionContext | undefined = cachedMeta?.selectionContext || undefined;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const writerRef = useRef<IncrementalIframeWriter | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -814,21 +812,24 @@ function PageContent() {
           const q = url.searchParams.get("q");
           if (q) {
             const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+            // Pre-save metadata to localStorage
+            preSavePage({ id: newPageId, query: q, parentId: pageId });
             const dest = new URL(`${getBasePath()}/page`, window.location.origin);
             dest.searchParams.set("id", newPageId);
-            dest.searchParams.set("q", q);
-            dest.searchParams.set("parentId", pageId);
-            const sc = url.searchParams.get("sc");
-            if (sc) dest.searchParams.set("sc", sc);
             targetHref = dest.pathname + dest.search;
           }
         } else {
-          url.searchParams.set("parentId", pageId);
+          // For other internal links, pre-save with parentId
+          const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+          const q = url.searchParams.get("q") || url.pathname;
+          preSavePage({ id: newPageId, query: q, parentId: pageId });
+          url.searchParams.set("id", newPageId);
+          url.searchParams.delete("parentId");
           targetHref = url.pathname + url.search;
         }
       } catch {
-        const sep = href.includes("?") ? "&" : "?";
-        targetHref = `${href}${sep}parentId=${encodeURIComponent(pageId)}`;
+        // Fallback: still just open the href
+        targetHref = href;
       }
       window.open(targetHref, "_blank", "noopener,noreferrer");
     }
@@ -1058,9 +1059,9 @@ function PageContent() {
     if (!trimmed || !selectionCtx) return;
 
     const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const sc = encodeURIComponent(JSON.stringify(selectionCtx));
+    preSavePage({ id: newPageId, query: trimmed, parentId: pageId, selectionContext: selectionCtx });
     window.open(
-      `${getBasePath()}/page?id=${newPageId}&q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}&sc=${sc}`,
+      `${getBasePath()}/page?id=${newPageId}`,
       "_blank",
       "noopener,noreferrer"
     );
@@ -1550,8 +1551,9 @@ function PageContent() {
     const trimmed = capsuleQuery.trim();
     if (!trimmed || trimmed === query) return;
     const newPageId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    preSavePage({ id: newPageId, query: trimmed, parentId: pageId });
     window.open(
-      `${getBasePath()}/page?id=${newPageId}&q=${encodeURIComponent(trimmed)}&parentId=${encodeURIComponent(pageId)}`,
+      `${getBasePath()}/page?id=${newPageId}`,
       "_blank",
       "noopener,noreferrer"
     );

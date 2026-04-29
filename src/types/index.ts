@@ -7,6 +7,7 @@ export interface PageData {
   title?: string;      // Page <title> extracted after generation
   links?: string[];    // Hyperlink queries (data-q values) from generated page
   summary?: string;    // AI-generated content summary for context continuity
+  selectionContext?: SelectionContext; // Context from highlight-to-ask (stored pre-navigation)
 }
 
 export interface HistoryItem {

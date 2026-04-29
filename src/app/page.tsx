@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { buildSessionTrees, clearAllPages, TreeNode } from "@/lib/client-store";
+import { buildSessionTrees, clearAllPages, preSavePage, TreeNode } from "@/lib/client-store";
 import { isConfigured, getBasePath, fetchElectronConfig, isElectronConfigured } from "@/lib/config";
 import { isElectron } from "@/lib/env";
 import SettingsModal from "@/components/SettingsModal";
@@ -29,7 +29,7 @@ function TreeNodeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
   const displayTitle = node.title || node.query;
 
   const handleClick = () => {
-    const url = `${getBasePath()}/page?id=${encodeURIComponent(node.id)}&q=${encodeURIComponent(node.query)}${node.parentId ? `&parentId=${encodeURIComponent(node.parentId)}` : ""}`;
+    const url = `${getBasePath()}/page?id=${encodeURIComponent(node.id)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -153,7 +153,8 @@ export default function HomePage() {
 
     setIsNavigating(true);
     const pageId = generateId();
-    window.location.href = `${getBasePath()}/page?id=${pageId}&q=${encodeURIComponent(text)}`;
+    preSavePage({ id: pageId, query: text });
+    window.location.href = `${getBasePath()}/page?id=${pageId}`;
   };
 
   const handleClearHistory = useCallback(() => {
