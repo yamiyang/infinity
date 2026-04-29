@@ -65,7 +65,18 @@
           <p class="text-xs text-gray-500">display: none，不产生任何可见输出。纯数据层。</p>
         </div>
       </div>
+
+      <!-- Tab bar -->
+      <div class="tab-bar" id="mainTabs">
+        <div class="tab-item active" data-tab="docs" onclick="switchTab('docs')">📖 文档</div>
+        <div class="tab-item" data-tab="playground" onclick="switchTab('playground')">🎮 Playground</div>
+      </div>
     </section>
+
+    <!-- ============================================================ -->
+    <!-- DOCS TAB                                                      -->
+    <!-- ============================================================ -->
+    <div id="tab-docs" class="tab-panel active space-y-16">
 
     <!-- ====== 核心概念 ====== -->
     <section id="concept">
@@ -342,13 +353,544 @@ const finalPrompt = buildPromptWithData(prompt, childData);</code><button class=
       <a href="./ai-image.html" class="text-sm text-indigo-600 hover:text-indigo-800 transition-colors">ai-image →</a>
     </div>
 
+    </div><!-- tab-docs -->
+
+    <!-- ============================================================ -->
+    <!-- PLAYGROUND TAB                                                -->
+    <!-- ============================================================ -->
+    <div id="tab-playground" class="tab-panel space-y-8">
+
+      <section id="playground">
+        <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm">🎮</span>
+          Playground
+        </h2>
+        <p class="text-sm text-gray-500 mb-6">配置 LLM API，体验 <code class="text-xs">&lt;ai-data&gt;</code> 的数据获取能力。支持两种模式：单独查看数据，或搭配 <code class="text-xs">&lt;ai-component&gt;</code> 实时渲染。</p>
+
+        <!-- Mode selector -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">演示模式</div>
+          <div class="flex gap-2 flex-wrap">
+            <button class="preset-chip active" data-mode="data-only" onclick="selectMode(this)">📊 单独获取数据</button>
+            <button class="preset-chip" data-mode="with-component" onclick="selectMode(this)">🧩 搭配 ai-component 渲染</button>
+          </div>
+        </div>
+
+        <!-- Config panel -->
+        <div class="rounded-2xl overflow-hidden mb-6 bg-white border border-gray-200">
+          <div class="px-5 py-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-gray-800 text-sm font-semibold">API 配置</span>
+              <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                <span class="w-2 h-2 rounded-full" id="statusDot" style="background:#ef4444;"></span>
+                <span id="statusText">未配置</span>
+              </div>
+            </div>
+            <div class="flex gap-2 mb-3 flex-wrap" id="presetContainer"></div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">API Key</label>
+                <input type="password" id="apiKey" class="config-input w-full" placeholder="sk-..." />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">Base URL</label>
+                <input type="text" id="baseUrl" class="config-input w-full" placeholder="https://api.openai.com/v1" />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">Model</label>
+                <input type="text" id="model" class="config-input w-full" placeholder="gpt-4o" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Format selector -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">输出格式</div>
+          <div class="flex gap-2 flex-wrap">
+            <button class="preset-chip active" data-format="json" onclick="selectFormat(this)">JSON (默认)</button>
+            <button class="preset-chip" data-format="text" onclick="selectFormat(this)">Text</button>
+            <button class="preset-chip" data-format="csv" onclick="selectFormat(this)">CSV</button>
+          </div>
+        </div>
+
+        <!-- Examples -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">示例数据</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="examplesGrid">
+            <div class="example-card" data-prompt="mock一个购物车数据，5件商品，包含名称、价格、数量">
+              <div class="text-lg mb-1">🛒</div>
+              <div class="font-semibold text-sm">购物车</div>
+              <div class="text-xs text-gray-400 mt-1">5件商品数据</div>
+            </div>
+            <div class="example-card" data-prompt="mock一个用户的个人资料：头像、姓名、邮箱、会员等级">
+              <div class="text-lg mb-1">👤</div>
+              <div class="font-semibold text-sm">用户资料</div>
+              <div class="text-xs text-gray-400 mt-1">个人信息</div>
+            </div>
+            <div class="example-card" data-prompt="生成5个随机用户数据，包含姓名、年龄、城市、职业">
+              <div class="text-lg mb-1">👥</div>
+              <div class="font-semibold text-sm">用户列表</div>
+              <div class="text-xs text-gray-400 mt-1">批量数据</div>
+            </div>
+            <div class="example-card" data-prompt="mock一组季度销售数据，包含4个季度的收入和利润">
+              <div class="text-lg mb-1">📊</div>
+              <div class="font-semibold text-sm">销售数据</div>
+              <div class="text-xs text-gray-400 mt-1">季度报表</div>
+            </div>
+            <div class="example-card" data-prompt="写一首关于春天的五言绝句" data-format="text">
+              <div class="text-lg mb-1">📝</div>
+              <div class="font-semibold text-sm">纯文本</div>
+              <div class="text-xs text-gray-400 mt-1">format=text</div>
+            </div>
+            <div class="example-card" data-prompt="mock一份销售报表数据，10行，包含日期、产品、销量、营收" data-format="csv">
+              <div class="text-lg mb-1">📄</div>
+              <div class="font-semibold text-sm">CSV 数据</div>
+              <div class="text-xs text-gray-400 mt-1">format=csv</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Combo examples (for with-component mode) -->
+        <div class="mb-4" id="comboExamplesSection" style="display:none;">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">组合示例 — ai-data + ai-component</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="comboExamplesGrid">
+            <div class="combo-example-card" data-data-prompt="mock一个购物车数据，5件商品，包含名称、价格、数量、图片URL" data-component-prompt="渲染一个精美的购物车列表页面">
+              <div class="text-lg mb-1">🛒</div>
+              <div class="font-semibold text-sm">购物车页面</div>
+              <div class="text-xs text-gray-400 mt-1">数据驱动 UI</div>
+            </div>
+            <div class="combo-example-card" data-data-prompt="mock一个用户的个人资料：头像URL、姓名、邮箱、会员等级、注册日期" data-component-prompt="渲染一个精美的用户资料卡片">
+              <div class="text-lg mb-1">👤</div>
+              <div class="font-semibold text-sm">用户卡片</div>
+              <div class="text-xs text-gray-400 mt-1">资料展示</div>
+            </div>
+            <div class="combo-example-card" data-data-prompt="mock一组季度销售数据，包含4个季度的收入、利润和环比增长率" data-component-prompt="用精美的图表和卡片展示这些销售数据">
+              <div class="text-lg mb-1">📈</div>
+              <div class="font-semibold text-sm">销售仪表盘</div>
+              <div class="text-xs text-gray-400 mt-1">数据可视化</div>
+            </div>
+            <div class="combo-example-card" data-data-prompt="mock一个餐厅菜单数据，8道菜，包含菜名、价格、描述、图片URL、辣度" data-component-prompt="渲染一个精美的餐厅菜单页面">
+              <div class="text-lg mb-1">🍽️</div>
+              <div class="font-semibold text-sm">餐厅菜单</div>
+              <div class="text-xs text-gray-400 mt-1">菜品展示</div>
+            </div>
+            <div class="combo-example-card" data-data-prompt="mock一个天气预报数据，包含今天和未来4天的天气、温度、风力、湿度" data-component-prompt="渲染一个精美的天气预报卡片，用emoji表示天气">
+              <div class="text-lg mb-1">🌤️</div>
+              <div class="font-semibold text-sm">天气预报</div>
+              <div class="text-xs text-gray-400 mt-1">5天预报</div>
+            </div>
+            <div class="combo-example-card" data-data-prompt="mock一个电商产品数据：名称、品牌、价格、原价、评分、评价数、规格参数、图片URL" data-component-prompt="渲染一个精美的产品详情页">
+              <div class="text-lg mb-1">📦</div>
+              <div class="font-semibold text-sm">产品详情</div>
+              <div class="text-xs text-gray-400 mt-1">电商页面</div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <!-- Prompt input (data-only mode) -->
+        <div id="dataOnlyInput">
+          <div class="flex gap-3 mb-4">
+            <textarea id="promptInput" class="prompt-input flex-1" rows="2" placeholder="描述你需要的数据内容…"></textarea>
+            <div class="flex flex-col gap-2">
+              <button class="gen-btn flex-1 text-sm" id="genBtn" onclick="generate()">🚀 获取</button>
+              <button class="gen-btn danger flex-1 text-sm" id="stopBtn" style="display:none;" onclick="stopGeneration()">⏹ 停止</button>
+            </div>
+          </div>
+          <div class="text-xs text-gray-400 mb-4">按 <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Ctrl</kbd> + <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Enter</kbd> 快速获取</div>
+        </div>
+
+        <!-- Prompt input (with-component mode) -->
+        <div id="comboInput" style="display:none;">
+          <div class="space-y-3 mb-4">
+            <div>
+              <label class="text-gray-500 text-xs font-semibold mb-1 block">📊 数据描述 (ai-data 的 prompt)</label>
+              <textarea id="comboDataPrompt" class="prompt-input w-full" rows="2" placeholder="描述需要的数据内容…"></textarea>
+            </div>
+            <div>
+              <label class="text-gray-500 text-xs font-semibold mb-1 block">🧩 渲染描述 (ai-component 的 prompt)</label>
+              <textarea id="comboComponentPrompt" class="prompt-input w-full" rows="2" placeholder="描述如何渲染这些数据…"></textarea>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button class="gen-btn text-sm" id="comboGenBtn" onclick="generateCombo()">🚀 获取数据 & 渲染</button>
+            <button class="gen-btn danger text-sm" id="comboStopBtn" style="display:none;" onclick="stopComboGeneration()">⏹ 停止</button>
+          </div>
+          <div class="text-xs text-gray-400 mt-2 mb-4">ai-data 先获取数据，然后 ai-component 拿到数据后自动渲染 UI</div>
+        </div>
+
+        <!-- Output -->
+        <div class="output-frame">
+          <div class="output-frame-header">
+            <div class="output-dot" style="background:#ef4444;"></div>
+            <div class="output-dot" style="background:#f59e0b;"></div>
+            <div class="output-dot" style="background:#22c55e;"></div>
+            <span class="text-xs text-gray-400 ml-2">DATA OUTPUT</span>
+            <button class="ml-auto text-xs text-gray-400 hover:text-red-400 transition-colors" onclick="clearOutput()">清空</button>
+          </div>
+          <div class="p-5 overflow-auto" id="output" style="min-height: 200px;">
+            <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
+              <div class="text-center">
+                <div class="text-3xl mb-2">📊</div>
+                <div>选择一个示例或输入描述<br>数据将在这里展示</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- tab-playground -->
+
   </div>
 </main>
 </div>
 
 <script type="module">
   import { renderNav } from '../shared/nav.js';
+  import { configure } from '../../dist/ai-components.js';
+
   renderNav({ currentPage: 'ai-data', basePath: '..' });
+
+  // ============================================================
+  // Tab switching
+  // ============================================================
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    if (tab === 'playground') {
+      history.replaceState(null, '', '#playground');
+    } else {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  if (window.location.hash === '#playground') {
+    switchTab('playground');
+  }
+
+  // ============================================================
+  // Provider presets
+  // ============================================================
+  const PRESETS = [
+    { id: 'openai',     name: 'OpenAI',            icon: '🟢', baseUrl: 'https://api.openai.com/v1',                                     defaultModel: 'gpt-4o' },
+    { id: 'deepseek',   name: 'DeepSeek',           icon: '🐋', baseUrl: 'https://api.deepseek.com',                                      defaultModel: 'deepseek-v4-flash' },
+    { id: 'claude',     name: 'Claude (OpenRouter)', icon: '🔮', baseUrl: 'https://openrouter.ai/api/v1',                                  defaultModel: 'anthropic/claude-sonnet-4' },
+    { id: 'gemini',     name: 'Gemini',             icon: '💎', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',        defaultModel: 'gemini-2.5-flash' },
+    { id: 'qwen',       name: 'Qwen',              icon: '☁️', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',              defaultModel: 'qwen-plus' },
+  ];
+
+  const STORAGE_KEY = 'aic_doc_config';
+  let selectedFormat = 'json';
+
+  function loadConfig() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+  }
+  function saveConfig(cfg) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+
+  function applyConfig() {
+    const cfg = loadConfig();
+    document.getElementById('apiKey').value  = cfg.apiKey  || '';
+    document.getElementById('baseUrl').value = cfg.baseUrl || 'https://api.openai.com/v1';
+    document.getElementById('model').value   = cfg.model   || 'gpt-4o';
+    updateStatus();
+    highlightPreset(cfg.provider || '');
+  }
+
+  function readFormConfig() {
+    return {
+      apiKey:  document.getElementById('apiKey').value.trim(),
+      baseUrl: document.getElementById('baseUrl').value.trim(),
+      model:   document.getElementById('model').value.trim(),
+    };
+  }
+
+  function updateStatus() {
+    const key = document.getElementById('apiKey').value.trim();
+    document.getElementById('statusDot').style.background = key ? '#22c55e' : '#ef4444';
+    document.getElementById('statusText').textContent = key ? '已配置' : '需要 API Key';
+  }
+
+  function persistConfig(extra = {}) {
+    saveConfig({ ...loadConfig(), ...readFormConfig(), ...extra });
+    updateStatus();
+  }
+
+  function renderPresets() {
+    const container = document.getElementById('presetContainer');
+    PRESETS.forEach(p => {
+      const el = document.createElement('div');
+      el.className = 'preset-chip';
+      el.dataset.id = p.id;
+      el.textContent = `${p.icon} ${p.name}`;
+      el.onclick = () => {
+        document.getElementById('baseUrl').value = p.baseUrl;
+        document.getElementById('model').value   = p.defaultModel;
+        highlightPreset(p.id);
+        persistConfig({ provider: p.id });
+      };
+      container.appendChild(el);
+    });
+  }
+
+  function highlightPreset(id) {
+    document.querySelectorAll('#presetContainer .preset-chip').forEach(el =>
+      el.classList.toggle('active', el.dataset.id === id)
+    );
+  }
+
+  // ============================================================
+  // Format selector
+  // ============================================================
+  window.selectFormat = function(btn) {
+    document.querySelectorAll('[data-format]').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    selectedFormat = btn.dataset.format;
+  };
+
+  // ============================================================
+  // OpenAI-compatible streaming request
+  // ============================================================
+  async function* openaiRequest(prompt, options = {}) {
+    const cfg = readFormConfig();
+    if (!cfg.apiKey) throw new Error('请先在上方配置 API Key');
+
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cfg.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: cfg.model || 'gpt-4o',
+        messages: [
+          { role: 'system', content: options.systemPrompt || '' },
+          { role: 'user',   content: prompt },
+        ],
+        temperature: 0.85,
+        max_tokens: 4096,
+        stream: true,
+      }),
+      signal: options.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`API Error ${res.status}: ${err}`);
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') return;
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) yield content;
+        } catch {}
+      }
+    }
+  }
+
+  // ============================================================
+  // Init
+  // ============================================================
+  configure({ request: openaiRequest });
+
+  import('../../dist/ai-components.js').then(mod => {
+    // 注册所有组件，因为组合模式需要 ai-component
+    if (mod.defineAll) mod.defineAll();
+    else {
+      if (mod.defineAIData) mod.defineAIData();
+      if (mod.defineAIComponent) mod.defineAIComponent();
+    }
+  });
+
+  renderPresets();
+  applyConfig();
+
+  ['apiKey', 'baseUrl', 'model'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => persistConfig());
+  });
+
+  // ============================================================
+  // Mode selector
+  // ============================================================
+  let currentMode = 'data-only';
+
+  window.selectMode = function(btn) {
+    document.querySelectorAll('[data-mode]').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+
+    const isCombo = currentMode === 'with-component';
+    document.getElementById('dataOnlyInput').style.display = isCombo ? 'none' : '';
+    document.getElementById('comboInput').style.display = isCombo ? '' : 'none';
+    document.getElementById('examplesGrid').parentElement.style.display = isCombo ? 'none' : '';
+    document.getElementById('comboExamplesSection').style.display = isCombo ? '' : 'none';
+    // 清空输出
+    clearOutput();
+  };
+
+  // ============================================================
+  // Generation
+  // ============================================================
+  window.generate = function() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) return;
+
+    const cfg = readFormConfig();
+    if (!cfg.apiKey) { alert('请先配置 API Key'); return; }
+
+    persistConfig();
+    switchTab('playground');
+
+    const output = document.getElementById('output');
+    output.innerHTML = '<div class="text-center text-gray-400 text-sm py-8"><div class="animate-spin inline-block w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full mb-2"></div><div>正在获取数据…</div></div>';
+
+    const comp = document.createElement('ai-data');
+    comp.setAttribute('p', prompt);
+    comp.setAttribute('format', selectedFormat);
+    document.body.appendChild(comp);
+
+    document.getElementById('genBtn').style.display  = 'none';
+    document.getElementById('stopBtn').style.display = '';
+
+    comp.addEventListener('ai-data-ready', (e) => {
+      const data = e.detail;
+      output.innerHTML = `<pre class="code-block" style="white-space: pre-wrap; word-break: break-all;"><code>${escapeHTML(data)}</code></pre>`;
+      comp.remove();
+      document.getElementById('genBtn').style.display  = '';
+      document.getElementById('stopBtn').style.display = 'none';
+    });
+
+    comp.addEventListener('ai-data-error', (e) => {
+      output.innerHTML = `<div class="text-red-500 text-sm p-4">❗ 错误：${escapeHTML(e.detail)}</div>`;
+      comp.remove();
+      document.getElementById('genBtn').style.display  = '';
+      document.getElementById('stopBtn').style.display = 'none';
+    });
+  };
+
+  function escapeHTML(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  window.stopGeneration = function() {
+    const comp = document.body.querySelector('ai-data');
+    if (comp) comp.remove();
+    document.getElementById('genBtn').style.display  = '';
+    document.getElementById('stopBtn').style.display = 'none';
+  };
+
+  window.clearOutput = function() {
+    document.getElementById('output').innerHTML = `
+      <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
+        <div class="text-center">
+          <div class="text-3xl mb-2">📊</div>
+          <div>选择一个示例或输入描述<br>数据将在这里展示</div>
+        </div>
+      </div>`;
+  };
+
+  // ============================================================
+  // Combo generation (ai-data + ai-component)
+  // ============================================================
+  window.generateCombo = function() {
+    const dataPrompt = document.getElementById('comboDataPrompt').value.trim();
+    const componentPrompt = document.getElementById('comboComponentPrompt').value.trim();
+    if (!dataPrompt || !componentPrompt) {
+      alert('请填写数据描述和渲染描述');
+      return;
+    }
+
+    const cfg = readFormConfig();
+    if (!cfg.apiKey) { alert('请先配置 API Key'); return; }
+
+    persistConfig();
+    switchTab('playground');
+
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+
+    // 创建 ai-component 包含 ai-data
+    const comp = document.createElement('ai-component');
+    comp.setAttribute('p', componentPrompt);
+
+    const dataEl = document.createElement('ai-data');
+    dataEl.setAttribute('p', dataPrompt);
+    dataEl.setAttribute('format', selectedFormat);
+    comp.appendChild(dataEl);
+
+    output.appendChild(comp);
+
+    document.getElementById('comboGenBtn').style.display  = 'none';
+    document.getElementById('comboStopBtn').style.display = '';
+
+    const check = setInterval(() => {
+      if (!comp._generating) {
+        clearInterval(check);
+        document.getElementById('comboGenBtn').style.display  = '';
+        document.getElementById('comboStopBtn').style.display = 'none';
+      }
+    }, 300);
+  };
+
+  window.stopComboGeneration = function() {
+    const comp = document.getElementById('output').querySelector('ai-component');
+    if (comp) comp._cancel?.();
+    document.getElementById('comboGenBtn').style.display  = '';
+    document.getElementById('comboStopBtn').style.display = 'none';
+  };
+
+  document.querySelectorAll('.example-card').forEach(card => {
+    card.addEventListener('click', () => {
+      // 切换到单独模式
+      if (currentMode !== 'data-only') {
+        document.querySelector('[data-mode="data-only"]').click();
+      }
+      switchTab('playground');
+      document.getElementById('promptInput').value = card.dataset.prompt;
+      if (card.dataset.format) {
+        selectedFormat = card.dataset.format;
+        document.querySelectorAll('[data-format]').forEach(el => el.classList.toggle('active', el.dataset.format === selectedFormat));
+      }
+      document.getElementById('promptInput').focus();
+    });
+  });
+
+  // Combo example cards
+  document.querySelectorAll('.combo-example-card').forEach(card => {
+    card.addEventListener('click', () => {
+      // 切换到组合模式
+      if (currentMode !== 'with-component') {
+        document.querySelector('[data-mode="with-component"]').click();
+      }
+      switchTab('playground');
+      document.getElementById('comboDataPrompt').value = card.dataset.dataPrompt;
+      document.getElementById('comboComponentPrompt').value = card.dataset.componentPrompt;
+      document.getElementById('comboDataPrompt').focus();
+    });
+  });
+
+  document.getElementById('promptInput').addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      window.generate();
+    }
+  });
 </script>
 </body>
 </html>

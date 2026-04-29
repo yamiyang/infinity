@@ -62,7 +62,18 @@
           而且内置的渲染器提供统一的排版和样式，确保视觉效果一致。
         </p>
       </div>
+
+      <!-- Tab bar -->
+      <div class="tab-bar" id="mainTabs">
+        <div class="tab-item active" data-tab="docs" onclick="switchTab('docs')">📖 文档</div>
+        <div class="tab-item" data-tab="playground" onclick="switchTab('playground')">🎮 Playground</div>
+      </div>
     </section>
+
+    <!-- ============================================================ -->
+    <!-- DOCS TAB                                                      -->
+    <!-- ============================================================ -->
+    <div id="tab-docs" class="tab-panel active space-y-16">
 
     <!-- ====== Quick Start ====== -->
     <section id="quick-start">
@@ -318,6 +329,127 @@
       </div>
     </section>
 
+    </div><!-- tab-docs -->
+
+    <!-- ============================================================ -->
+    <!-- PLAYGROUND TAB                                                -->
+    <!-- ============================================================ -->
+    <div id="tab-playground" class="tab-panel space-y-8">
+
+      <section id="playground">
+        <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center text-sm">🎮</span>
+          Playground
+        </h2>
+        <p class="text-sm text-gray-500 mb-6">配置你的 LLM API，然后输入 prompt 体验 Markdown 流式渲染。可以切换不同的 <code class="text-xs">theme</code> 查看效果。</p>
+
+        <!-- Config panel -->
+        <div class="rounded-2xl overflow-hidden mb-6 bg-white border border-gray-200">
+          <div class="px-5 py-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-gray-800 text-sm font-semibold">API 配置</span>
+              <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                <span class="w-2 h-2 rounded-full" id="statusDot" style="background:#ef4444;"></span>
+                <span id="statusText">未配置</span>
+              </div>
+            </div>
+            <div class="flex gap-2 mb-3 flex-wrap" id="presetContainer"></div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">API Key</label>
+                <input type="password" id="apiKey" class="config-input w-full" placeholder="sk-..." />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">Base URL</label>
+                <input type="text" id="baseUrl" class="config-input w-full" placeholder="https://api.openai.com/v1" />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">Model</label>
+                <input type="text" id="model" class="config-input w-full" placeholder="gpt-4o" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Theme selector -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">渲染主题</div>
+          <div class="flex gap-2 flex-wrap">
+            <button class="preset-chip active" data-theme="github" onclick="selectTheme(this)">🟢 github (默认)</button>
+            <button class="preset-chip" data-theme="minimal" onclick="selectTheme(this)">⚪ minimal</button>
+            <button class="preset-chip" data-theme="dark" onclick="selectTheme(this)">🟣 dark</button>
+          </div>
+        </div>
+
+        <!-- Examples -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">示例 Prompt</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="examplesGrid">
+            <div class="example-card" data-prompt="写一篇简短的 CSS Grid 入门教程，包含代码示例">
+              <div class="text-lg mb-1">📚</div>
+              <div class="font-semibold text-sm">CSS Grid 教程</div>
+              <div class="text-xs text-gray-400 mt-1">技术教程</div>
+            </div>
+            <div class="example-card" data-prompt="用表格对比 React, Vue, Svelte 三个框架的优缺点、学习曲线和社区生态">
+              <div class="text-lg mb-1">📊</div>
+              <div class="font-semibold text-sm">框架对比</div>
+              <div class="text-xs text-gray-400 mt-1">表格对比分析</div>
+            </div>
+            <div class="example-card" data-prompt="用 Markdown 解释 async/await 的工作原理，包含代码示例">
+              <div class="text-lg mb-1">⚡</div>
+              <div class="font-semibold text-sm">async/await</div>
+              <div class="text-xs text-gray-400 mt-1">代码示例</div>
+            </div>
+            <div class="example-card" data-prompt="写一份月度项目总结报告，包含进度概览、关键成果、风险项和下月计划">
+              <div class="text-lg mb-1">📋</div>
+              <div class="font-semibold text-sm">项目报告</div>
+              <div class="text-xs text-gray-400 mt-1">结构化文档</div>
+            </div>
+            <div class="example-card" data-prompt="写一篇关于 TypeScript 泛型的简短教程，从基础到进阶">
+              <div class="text-lg mb-1">📘</div>
+              <div class="font-semibold text-sm">TS 泛型教程</div>
+              <div class="text-xs text-gray-400 mt-1">基础到进阶</div>
+            </div>
+            <div class="example-card" data-prompt="写一份开源项目的 README，包含项目介绍、安装步骤、使用示例和贡献指南">
+              <div class="text-lg mb-1">📄</div>
+              <div class="font-semibold text-sm">README 模板</div>
+              <div class="text-xs text-gray-400 mt-1">开源项目</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prompt input + generate -->
+        <div class="flex gap-3 mb-4">
+          <textarea id="promptInput" class="prompt-input flex-1" rows="2" placeholder="输入自然语言 prompt，LLM 将以 Markdown 格式输出并实时渲染…"></textarea>
+          <div class="flex flex-col gap-2">
+            <button class="gen-btn flex-1 text-sm" id="genBtn" onclick="generate()">🚀 生成</button>
+            <button class="gen-btn danger flex-1 text-sm" id="stopBtn" style="display:none;" onclick="stopGeneration()">⏹ 停止</button>
+          </div>
+        </div>
+        <div class="text-xs text-gray-400 mb-4">按 <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Ctrl</kbd> + <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Enter</kbd> 快速生成</div>
+
+        <!-- Output -->
+        <div class="output-frame" id="outputFrame">
+          <div class="output-frame-header">
+            <div class="output-dot" style="background:#ef4444;"></div>
+            <div class="output-dot" style="background:#f59e0b;"></div>
+            <div class="output-dot" style="background:#22c55e;"></div>
+            <span class="text-xs text-gray-400 ml-2">OUTPUT</span>
+            <button class="ml-auto text-xs text-gray-400 hover:text-red-400 transition-colors" onclick="clearOutput()">清空</button>
+          </div>
+          <div class="p-5 overflow-auto" id="output" style="min-height: 200px;">
+            <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
+              <div class="text-center">
+                <div class="text-3xl mb-2">📝</div>
+                <div>选择一个示例或输入 prompt<br>Markdown 将在这里实时渲染为精美 HTML</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- tab-playground -->
+
   </div><!-- max-w-4xl -->
 </main>
 </div><!-- flex -->
@@ -325,8 +457,264 @@
 <!-- Scripts -->
 <script type="module">
   import { renderNav, copyCode } from '../shared/nav.js';
+  import { configure } from '../../dist/ai-components.js';
+
   renderNav({ currentPage: 'ai-markdown', basePath: '..' });
   window.copyCode = copyCode;
+
+  // ============================================================
+  // Tab switching
+  // ============================================================
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    if (tab === 'playground') {
+      history.replaceState(null, '', '#playground');
+    } else {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  if (window.location.hash === '#playground') {
+    switchTab('playground');
+  }
+
+  // ============================================================
+  // Provider presets
+  // ============================================================
+  const PRESETS = [
+    { id: 'openai',     name: 'OpenAI',            icon: '🟢', baseUrl: 'https://api.openai.com/v1',                                     defaultModel: 'gpt-4o' },
+    { id: 'deepseek',   name: 'DeepSeek',           icon: '🐋', baseUrl: 'https://api.deepseek.com',                                      defaultModel: 'deepseek-v4-flash' },
+    { id: 'claude',     name: 'Claude (OpenRouter)', icon: '🔮', baseUrl: 'https://openrouter.ai/api/v1',                                  defaultModel: 'anthropic/claude-sonnet-4' },
+    { id: 'gemini',     name: 'Gemini',             icon: '💎', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',        defaultModel: 'gemini-2.5-flash' },
+    { id: 'qwen',       name: 'Qwen',              icon: '☁️', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',              defaultModel: 'qwen-plus' },
+  ];
+
+  const STORAGE_KEY = 'aic_doc_config';
+  let selectedTheme = 'github';
+
+  function loadConfig() {
+    try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {}; }
+    catch { return {}; }
+  }
+  function saveConfig(cfg) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+
+  function applyConfig() {
+    const cfg = loadConfig();
+    document.getElementById('apiKey').value  = cfg.apiKey  || '';
+    document.getElementById('baseUrl').value = cfg.baseUrl || 'https://api.openai.com/v1';
+    document.getElementById('model').value   = cfg.model   || 'gpt-4o';
+    updateStatus();
+    highlightPreset(cfg.provider || '');
+  }
+
+  function readFormConfig() {
+    return {
+      apiKey:  document.getElementById('apiKey').value.trim(),
+      baseUrl: document.getElementById('baseUrl').value.trim(),
+      model:   document.getElementById('model').value.trim(),
+    };
+  }
+
+  function updateStatus() {
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const key  = document.getElementById('apiKey').value.trim();
+    dot.style.background = key ? '#22c55e' : '#ef4444';
+    text.textContent     = key ? '已配置' : '需要 API Key';
+  }
+
+  function persistConfig(extra = {}) {
+    saveConfig({ ...loadConfig(), ...readFormConfig(), ...extra });
+    updateStatus();
+  }
+
+  function renderPresets() {
+    const container = document.getElementById('presetContainer');
+    PRESETS.forEach(p => {
+      const el = document.createElement('div');
+      el.className = 'preset-chip';
+      el.dataset.id = p.id;
+      el.textContent = `${p.icon} ${p.name}`;
+      el.onclick = () => {
+        document.getElementById('baseUrl').value = p.baseUrl;
+        document.getElementById('model').value   = p.defaultModel;
+        highlightPreset(p.id);
+        persistConfig({ provider: p.id });
+      };
+      container.appendChild(el);
+    });
+  }
+
+  function highlightPreset(id) {
+    document.querySelectorAll('#presetContainer .preset-chip').forEach(el =>
+      el.classList.toggle('active', el.dataset.id === id)
+    );
+  }
+
+  // ============================================================
+  // Theme selector
+  // ============================================================
+  window.selectTheme = function(btn) {
+    document.querySelectorAll('[data-theme]').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    selectedTheme = btn.dataset.theme;
+    // 切换输出区域背景
+    const frame = document.getElementById('outputFrame');
+    if (selectedTheme === 'dark') {
+      frame.style.background = '#0f172a';
+    } else {
+      frame.style.background = '';
+    }
+  };
+
+  // ============================================================
+  // OpenAI-compatible streaming request
+  // ============================================================
+  async function* openaiRequest(prompt, options = {}) {
+    const cfg = readFormConfig();
+    if (!cfg.apiKey) throw new Error('请先在上方配置 API Key');
+
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cfg.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: cfg.model || 'gpt-4o',
+        messages: [
+          { role: 'system', content: options.systemPrompt || '' },
+          { role: 'user',   content: prompt },
+        ],
+        temperature: 0.85,
+        max_tokens: 4096,
+        stream: true,
+      }),
+      signal: options.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`API Error ${res.status}: ${err}`);
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer    = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') return;
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) yield content;
+        } catch {}
+      }
+    }
+  }
+
+  // ============================================================
+  // Init
+  // ============================================================
+  configure({ request: openaiRequest });
+
+  import('../../dist/ai-components.js').then(mod => {
+    if (mod.defineAIMarkdown) mod.defineAIMarkdown();
+    else if (mod.defineAll) mod.defineAll();
+  });
+
+  renderPresets();
+  applyConfig();
+
+  ['apiKey', 'baseUrl', 'model'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => persistConfig());
+  });
+
+  // ============================================================
+  // Generation
+  // ============================================================
+  window.generate = function() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) return;
+
+    const cfg = readFormConfig();
+    if (!cfg.apiKey) { alert('请先配置 API Key'); return; }
+
+    persistConfig();
+    switchTab('playground');
+
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+
+    // 切换输出区域背景
+    const frame = document.getElementById('outputFrame');
+    if (selectedTheme === 'dark') {
+      frame.style.background = '#0f172a';
+    } else {
+      frame.style.background = '';
+    }
+
+    const comp = document.createElement('ai-markdown');
+    comp.setAttribute('p', prompt);
+    comp.setAttribute('theme', selectedTheme);
+    output.appendChild(comp);
+
+    document.getElementById('genBtn').style.display  = 'none';
+    document.getElementById('stopBtn').style.display = '';
+
+    const check = setInterval(() => {
+      if (!comp._generating) {
+        clearInterval(check);
+        document.getElementById('genBtn').style.display  = '';
+        document.getElementById('stopBtn').style.display = 'none';
+      }
+    }, 300);
+  };
+
+  window.stopGeneration = function() {
+    const comp = document.getElementById('output').querySelector('ai-markdown');
+    if (comp) comp._cancel?.();
+    document.getElementById('genBtn').style.display  = '';
+    document.getElementById('stopBtn').style.display = 'none';
+  };
+
+  window.clearOutput = function() {
+    const frame = document.getElementById('outputFrame');
+    frame.style.background = '';
+    document.getElementById('output').innerHTML = `
+      <div class="flex items-center justify-center h-48 text-gray-300 text-sm">
+        <div class="text-center">
+          <div class="text-3xl mb-2">📝</div>
+          <div>选择一个示例或输入 prompt<br>Markdown 将在这里实时渲染为精美 HTML</div>
+        </div>
+      </div>`;
+  };
+
+  document.querySelectorAll('.example-card').forEach(card => {
+    card.addEventListener('click', () => {
+      switchTab('playground');
+      document.getElementById('promptInput').value = card.dataset.prompt;
+      document.getElementById('promptInput').focus();
+    });
+  });
+
+  document.getElementById('promptInput').addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      window.generate();
+    }
+  });
 </script>
 </body>
 </html>

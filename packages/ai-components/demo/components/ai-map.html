@@ -39,7 +39,18 @@
         AI 驱动的智能地图组件——通过自然语言描述地点、路线或区域，自动解析位置信息并展示交互式地图。
         基于 OpenStreetMap，无需 API Key 即可使用。如果配置了 LLM，会使用 AI 更精准地理解位置描述。
       </p>
+
+      <!-- Tab bar -->
+      <div class="tab-bar" id="mainTabs">
+        <div class="tab-item active" data-tab="docs" onclick="switchTab('docs')">📖 文档</div>
+        <div class="tab-item" data-tab="playground" onclick="switchTab('playground')">🎮 Playground</div>
+      </div>
     </section>
+
+    <!-- ============================================================ -->
+    <!-- DOCS TAB                                                      -->
+    <!-- ============================================================ -->
+    <div id="tab-docs" class="tab-panel active space-y-16">
 
     <!-- Props -->
     <section id="props">
@@ -140,6 +151,84 @@
       <a href="./ai-music.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">&lt;ai-music&gt; →</a>
     </div>
 
+    </div><!-- tab-docs -->
+
+    <!-- ============================================================ -->
+    <!-- PLAYGROUND TAB                                                -->
+    <!-- ============================================================ -->
+    <div id="tab-playground" class="tab-panel space-y-8">
+
+      <section id="playground">
+        <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm">🎮</span>
+          Playground
+        </h2>
+        <p class="text-sm text-gray-500 mb-6">输入地点名称或地址，自动解析并展示交互式地图。基于 OpenStreetMap，无需 API Key。</p>
+
+        <!-- Examples -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">示例地点</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="examplesGrid">
+            <div class="example-card" data-prompt="北京天安门">
+              <div class="text-lg mb-1">🇨🇳</div>
+              <div class="font-semibold text-sm">天安门</div>
+              <div class="text-xs text-gray-400 mt-1">北京地标</div>
+            </div>
+            <div class="example-card" data-prompt="东京塔">
+              <div class="text-lg mb-1">🗼</div>
+              <div class="font-semibold text-sm">东京塔</div>
+              <div class="text-xs text-gray-400 mt-1">日本地标</div>
+            </div>
+            <div class="example-card" data-prompt="Times Square, New York">
+              <div class="text-lg mb-1">🇺🇸</div>
+              <div class="font-semibold text-sm">时代广场</div>
+              <div class="text-xs text-gray-400 mt-1">纽约地标</div>
+            </div>
+            <div class="example-card" data-prompt="巴黎埃菲尔铁塔">
+              <div class="text-lg mb-1">🇫🇷</div>
+              <div class="font-semibold text-sm">埃菲尔铁塔</div>
+              <div class="text-xs text-gray-400 mt-1">巴黎地标</div>
+            </div>
+            <div class="example-card" data-prompt="Sydney Opera House">
+              <div class="text-lg mb-1">🇦🇺</div>
+              <div class="font-semibold text-sm">悉尼歌剧院</div>
+              <div class="text-xs text-gray-400 mt-1">澳大利亚</div>
+            </div>
+            <div class="example-card" data-prompt="上海外滩">
+              <div class="text-lg mb-1">🏢</div>
+              <div class="font-semibold text-sm">上海外滩</div>
+              <div class="text-xs text-gray-400 mt-1">上海地标</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prompt input + generate -->
+        <div class="flex gap-3 mb-4">
+          <input type="text" id="promptInput" class="prompt-input flex-1" placeholder="输入地点名称或地址…" />
+          <button class="gen-btn text-sm" id="genBtn" onclick="generate()">🗺️ 定位</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-4">按 <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Enter</kbd> 快速定位</div>
+
+        <!-- Output -->
+        <div class="output-frame">
+          <div class="output-frame-header">
+            <div class="output-dot" style="background:#ef4444;"></div>
+            <div class="output-dot" style="background:#f59e0b;"></div>
+            <div class="output-dot" style="background:#22c55e;"></div>
+            <span class="text-xs text-gray-400 ml-2">OUTPUT</span>
+            <button class="ml-auto text-xs text-gray-400 hover:text-red-400 transition-colors" onclick="clearOutput()">清空</button>
+          </div>
+          <div class="p-5 overflow-auto flex items-center justify-center" id="output" style="min-height: 400px;">
+            <div class="text-center text-gray-300 text-sm">
+              <div class="text-3xl mb-2">🗺️</div>
+              <div>输入地点或选择示例<br>地图将在这里展示</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- tab-playground -->
+
   </div>
 </main>
 </div>
@@ -148,6 +237,71 @@
   import { renderNav, copyCode } from '../shared/nav.js';
   renderNav({ currentPage: 'ai-map', basePath: '..' });
   window.copyCode = copyCode;
+
+  // ============================================================
+  // Tab switching
+  // ============================================================
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    if (tab === 'playground') {
+      history.replaceState(null, '', '#playground');
+    } else {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  if (window.location.hash === '#playground') {
+    switchTab('playground');
+  }
+
+  // 动态导入并注册 ai-map 组件
+  import('../../dist/ai-components.js').then(mod => {
+    if (mod.defineAIMap) mod.defineAIMap();
+    else if (mod.defineAll) mod.defineAll();
+  });
+
+  // ============================================================
+  // Generation
+  // ============================================================
+  window.generate = function() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) return;
+
+    switchTab('playground');
+
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+
+    const comp = document.createElement('ai-map');
+    comp.setAttribute('p', prompt);
+    comp.setAttribute('width', '700');
+    comp.setAttribute('height', '450');
+    output.appendChild(comp);
+  };
+
+  window.clearOutput = function() {
+    document.getElementById('output').innerHTML = `
+      <div class="text-center text-gray-300 text-sm">
+        <div class="text-3xl mb-2">🗺️</div>
+        <div>输入地点或选择示例<br>地图将在这里展示</div>
+      </div>`;
+  };
+
+  document.querySelectorAll('.example-card').forEach(card => {
+    card.addEventListener('click', () => {
+      switchTab('playground');
+      document.getElementById('promptInput').value = card.dataset.prompt;
+      document.getElementById('promptInput').focus();
+    });
+  });
+
+  document.getElementById('promptInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      window.generate();
+    }
+  });
 </script>
 </body>
 </html>

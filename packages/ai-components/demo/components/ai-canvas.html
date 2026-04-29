@@ -39,7 +39,18 @@
         AI 驱动的文生图组件——通过自然语言描述想要的图片，调用文生图 API（如 DALL-E、Stable Diffusion）生成图片。
         支持标准 <code>&lt;img&gt;</code> 标签的属性。
       </p>
+
+      <!-- Tab bar -->
+      <div class="tab-bar" id="mainTabs">
+        <div class="tab-item active" data-tab="docs" onclick="switchTab('docs')">📖 文档</div>
+        <div class="tab-item" data-tab="playground" onclick="switchTab('playground')">🎮 Playground</div>
+      </div>
     </section>
+
+    <!-- ============================================================ -->
+    <!-- DOCS TAB                                                      -->
+    <!-- ============================================================ -->
+    <div id="tab-docs" class="tab-panel active space-y-16">
 
     <!-- Props -->
     <section id="props">
@@ -157,6 +168,96 @@
       <a href="./ai-map.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">&lt;ai-map&gt; →</a>
     </div>
 
+    </div><!-- tab-docs -->
+
+    <!-- ============================================================ -->
+    <!-- PLAYGROUND TAB                                                -->
+    <!-- ============================================================ -->
+    <div id="tab-playground" class="tab-panel space-y-8">
+
+      <section id="playground">
+        <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm">🎮</span>
+          Playground
+        </h2>
+        <p class="text-sm text-gray-500 mb-6">配置文生图 API，输入自然语言描述，AI 将为你生成图片。通常需要 10-30 秒。</p>
+
+        <!-- Config panel -->
+        <div class="rounded-2xl overflow-hidden mb-6 bg-white border border-gray-200">
+          <div class="px-5 py-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-gray-800 text-sm font-semibold">文生图 API 配置</span>
+              <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                <span class="w-2 h-2 rounded-full" id="statusDot" style="background:#ef4444;"></span>
+                <span id="statusText">未配置</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">API Key</label>
+                <input type="password" id="apiKey" class="config-input w-full" placeholder="sk-..." />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">API URL</label>
+                <input type="text" id="apiUrl" class="config-input w-full" placeholder="https://api.openai.com/v1/images/generations" />
+              </div>
+              <div>
+                <label class="text-gray-500 text-[11px] mb-1 block">Model</label>
+                <input type="text" id="canvasModel" class="config-input w-full" placeholder="dall-e-3" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Examples -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">示例描述</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="examplesGrid">
+            <div class="example-card" data-prompt="一只穿着宇航服的猫在月球上漫步">
+              <div class="text-lg mb-1">🚀</div>
+              <div class="font-semibold text-sm">太空猫</div>
+              <div class="text-xs text-gray-400 mt-1">创意插画</div>
+            </div>
+            <div class="example-card" data-prompt="a watercolor painting of a Japanese garden in autumn">
+              <div class="text-lg mb-1">🌻</div>
+              <div class="font-semibold text-sm">日式庭院</div>
+              <div class="text-xs text-gray-400 mt-1">水彩风格</div>
+            </div>
+            <div class="example-card" data-prompt="赛博朋克风格的未来城市天际线，霸气的光影效果">
+              <div class="text-lg mb-1">🏙️</div>
+              <div class="font-semibold text-sm">未来城市</div>
+              <div class="text-xs text-gray-400 mt-1">赛博朋克</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prompt input + generate -->
+        <div class="flex gap-3 mb-4">
+          <input type="text" id="promptInput" class="prompt-input flex-1" placeholder="描述你想要生成的图片…" />
+          <button class="gen-btn text-sm" id="genBtn" onclick="generate()">🎨 生成</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-4">按 <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Enter</kbd> 快速生成</div>
+
+        <!-- Output -->
+        <div class="output-frame">
+          <div class="output-frame-header">
+            <div class="output-dot" style="background:#ef4444;"></div>
+            <div class="output-dot" style="background:#f59e0b;"></div>
+            <div class="output-dot" style="background:#22c55e;"></div>
+            <span class="text-xs text-gray-400 ml-2">OUTPUT</span>
+            <button class="ml-auto text-xs text-gray-400 hover:text-red-400 transition-colors" onclick="clearOutput()">清空</button>
+          </div>
+          <div class="p-5 overflow-auto flex items-center justify-center" id="output" style="min-height: 300px;">
+            <div class="text-center text-gray-300 text-sm">
+              <div class="text-3xl mb-2">🎨</div>
+              <div>输入描述或选择示例<br>AI 将为你生成图片</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- tab-playground -->
+
   </div>
 </main>
 </div>
@@ -165,6 +266,117 @@
   import { renderNav, copyCode } from '../shared/nav.js';
   renderNav({ currentPage: 'ai-canvas', basePath: '..' });
   window.copyCode = copyCode;
+
+  // ============================================================
+  // Tab switching
+  // ============================================================
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    if (tab === 'playground') {
+      history.replaceState(null, '', '#playground');
+    } else {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  if (window.location.hash === '#playground') {
+    switchTab('playground');
+  }
+
+  // Config
+  const STORAGE_KEY = 'aic_canvas_config';
+  function loadConfig() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+  }
+  function saveConfig(cfg) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+
+  function applyConfig() {
+    const cfg = loadConfig();
+    document.getElementById('apiKey').value = cfg.apiKey || '';
+    document.getElementById('apiUrl').value = cfg.apiUrl || 'https://api.openai.com/v1/images/generations';
+    document.getElementById('canvasModel').value = cfg.model || 'dall-e-3';
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const key = document.getElementById('apiKey').value.trim();
+    document.getElementById('statusDot').style.background = key ? '#22c55e' : '#ef4444';
+    document.getElementById('statusText').textContent = key ? '已配置' : '需要 API Key';
+  }
+
+  function persistConfig() {
+    saveConfig({
+      apiKey: document.getElementById('apiKey').value.trim(),
+      apiUrl: document.getElementById('apiUrl').value.trim(),
+      model: document.getElementById('canvasModel').value.trim(),
+    });
+    updateStatus();
+  }
+
+  applyConfig();
+  ['apiKey', 'apiUrl', 'canvasModel'].forEach(id => {
+    document.getElementById(id).addEventListener('input', persistConfig);
+  });
+
+  // 动态导入并注册 ai-canvas 组件
+  import('../../dist/ai-components.js').then(mod => {
+    if (mod.defineAICanvas) mod.defineAICanvas();
+    else if (mod.defineAll) mod.defineAll();
+  });
+
+  // ============================================================
+  // Generation
+  // ============================================================
+  window.generate = function() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) return;
+
+    const apiKey = document.getElementById('apiKey').value.trim();
+    if (!apiKey) { alert('请先配置 API Key'); return; }
+
+    persistConfig();
+    switchTab('playground');
+
+    // 配置 ai-canvas
+    window.__ai_canvas_config = {
+      apiUrl: document.getElementById('apiUrl').value.trim(),
+      apiKey: apiKey,
+      model: document.getElementById('canvasModel').value.trim() || 'dall-e-3',
+    };
+
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+
+    const comp = document.createElement('ai-canvas');
+    comp.setAttribute('p', prompt);
+    comp.setAttribute('width', '512');
+    comp.setAttribute('height', '512');
+    output.appendChild(comp);
+  };
+
+  window.clearOutput = function() {
+    document.getElementById('output').innerHTML = `
+      <div class="text-center text-gray-300 text-sm">
+        <div class="text-3xl mb-2">🎨</div>
+        <div>输入描述或选择示例<br>AI 将为你生成图片</div>
+      </div>`;
+  };
+
+  document.querySelectorAll('.example-card').forEach(card => {
+    card.addEventListener('click', () => {
+      switchTab('playground');
+      document.getElementById('promptInput').value = card.dataset.prompt;
+      document.getElementById('promptInput').focus();
+    });
+  });
+
+  document.getElementById('promptInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      window.generate();
+    }
+  });
 </script>
 </body>
 </html>

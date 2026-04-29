@@ -39,7 +39,18 @@
         AI 驱动的智能图片搜索组件——通过自然语言描述图片内容，自动搜索最匹配的图片并展示。
         支持标准 <code>&lt;img&gt;</code> 标签的所有属性（width、height、alt、loading 等）。
       </p>
+
+      <!-- Tab bar -->
+      <div class="tab-bar" id="mainTabs">
+        <div class="tab-item active" data-tab="docs" onclick="switchTab('docs')">📖 文档</div>
+        <div class="tab-item" data-tab="playground" onclick="switchTab('playground')">🎮 Playground</div>
+      </div>
     </section>
+
+    <!-- ============================================================ -->
+    <!-- DOCS TAB                                                      -->
+    <!-- ============================================================ -->
+    <div id="tab-docs" class="tab-panel active space-y-16">
 
     <!-- Props -->
     <section id="props">
@@ -150,6 +161,84 @@
       <a href="./ai-canvas.html" class="text-sm text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">&lt;ai-canvas&gt; →</a>
     </div>
 
+    </div><!-- tab-docs -->
+
+    <!-- ============================================================ -->
+    <!-- PLAYGROUND TAB                                                -->
+    <!-- ============================================================ -->
+    <div id="tab-playground" class="tab-panel space-y-8">
+
+      <section id="playground">
+        <h2 class="text-xl font-bold mb-2 flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-pink-100 text-pink-600 flex items-center justify-center text-sm">🎮</span>
+          Playground
+        </h2>
+        <p class="text-sm text-gray-500 mb-6">输入自然语言描述，自动搜索并展示匹配的免费高清图片。基于 Unsplash API。</p>
+
+        <!-- Examples -->
+        <div class="mb-4">
+          <div class="text-xs font-semibold text-gray-400 mb-2 uppercase">示例描述</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="examplesGrid">
+            <div class="example-card" data-prompt="一只在雪地里奔跑的柯基">
+              <div class="text-lg mb-1">🐶</div>
+              <div class="font-semibold text-sm">雪地柯基</div>
+              <div class="text-xs text-gray-400 mt-1">可爱动物</div>
+            </div>
+            <div class="example-card" data-prompt="夕阳下的海边灯塔">
+              <div class="text-lg mb-1">🌅</div>
+              <div class="font-semibold text-sm">海边灯塔</div>
+              <div class="text-xs text-gray-400 mt-1">风景摄影</div>
+            </div>
+            <div class="example-card" data-prompt="minimalist workspace with coffee and laptop">
+              <div class="text-lg mb-1">☕</div>
+              <div class="font-semibold text-sm">极简工作台</div>
+              <div class="text-xs text-gray-400 mt-1">办公场景</div>
+            </div>
+            <div class="example-card" data-prompt="樱花盛开的日本寺庙">
+              <div class="text-lg mb-1">🌸</div>
+              <div class="font-semibold text-sm">樱花寺庙</div>
+              <div class="text-xs text-gray-400 mt-1">日本风光</div>
+            </div>
+            <div class="example-card" data-prompt="aurora borealis over snowy mountains">
+              <div class="text-lg mb-1">🌌</div>
+              <div class="font-semibold text-sm">极光</div>
+              <div class="text-xs text-gray-400 mt-1">自然奇观</div>
+            </div>
+            <div class="example-card" data-prompt="美食摄影 精致的法式甜点">
+              <div class="text-lg mb-1">🍰</div>
+              <div class="font-semibold text-sm">法式甜点</div>
+              <div class="text-xs text-gray-400 mt-1">美食摄影</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prompt input + generate -->
+        <div class="flex gap-3 mb-4">
+          <input type="text" id="promptInput" class="prompt-input flex-1" placeholder="描述你想要的图片内容…" />
+          <button class="gen-btn text-sm" id="genBtn" onclick="generate()">🔍 搜索</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-4">按 <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">Enter</kbd> 快速搜索</div>
+
+        <!-- Output -->
+        <div class="output-frame">
+          <div class="output-frame-header">
+            <div class="output-dot" style="background:#ef4444;"></div>
+            <div class="output-dot" style="background:#f59e0b;"></div>
+            <div class="output-dot" style="background:#22c55e;"></div>
+            <span class="text-xs text-gray-400 ml-2">OUTPUT</span>
+            <button class="ml-auto text-xs text-gray-400 hover:text-red-400 transition-colors" onclick="clearOutput()">清空</button>
+          </div>
+          <div class="p-5 overflow-auto flex items-center justify-center" id="output" style="min-height: 300px;">
+            <div class="text-center text-gray-300 text-sm">
+              <div class="text-3xl mb-2">🖼️</div>
+              <div>输入描述或选择示例<br>图片将在这里展示</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- tab-playground -->
+
   </div>
 </main>
 </div>
@@ -158,6 +247,71 @@
   import { renderNav, copyCode } from '../shared/nav.js';
   renderNav({ currentPage: 'ai-image', basePath: '..' });
   window.copyCode = copyCode;
+
+  // ============================================================
+  // Tab switching
+  // ============================================================
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    if (tab === 'playground') {
+      history.replaceState(null, '', '#playground');
+    } else {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  if (window.location.hash === '#playground') {
+    switchTab('playground');
+  }
+
+  // 动态导入并注册 ai-image 组件
+  import('../../dist/ai-components.js').then(mod => {
+    if (mod.defineAIImage) mod.defineAIImage();
+    else if (mod.defineAll) mod.defineAll();
+  });
+
+  // ============================================================
+  // Generation
+  // ============================================================
+  window.generate = function() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) return;
+
+    switchTab('playground');
+
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+
+    const comp = document.createElement('ai-image');
+    comp.setAttribute('p', prompt);
+    comp.setAttribute('width', '600');
+    comp.setAttribute('height', '400');
+    output.appendChild(comp);
+  };
+
+  window.clearOutput = function() {
+    document.getElementById('output').innerHTML = `
+      <div class="text-center text-gray-300 text-sm">
+        <div class="text-3xl mb-2">🖼️</div>
+        <div>输入描述或选择示例<br>图片将在这里展示</div>
+      </div>`;
+  };
+
+  document.querySelectorAll('.example-card').forEach(card => {
+    card.addEventListener('click', () => {
+      switchTab('playground');
+      document.getElementById('promptInput').value = card.dataset.prompt;
+      document.getElementById('promptInput').focus();
+    });
+  });
+
+  document.getElementById('promptInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      window.generate();
+    }
+  });
 </script>
 </body>
 </html>
