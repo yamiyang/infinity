@@ -1,0 +1,58 @@
+{
+  "name": "ai-components",
+  "version": "0.1.0",
+  "description": "Natural-language-driven Web Components powered by LLM. Drop <wc-content>, <wc-table>, <wc-card> into any HTML — framework-free.",
+  "type": "module",
+  "main": "./dist/ai-components.cjs",
+  "module": "./dist/ai-components.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/ai-components.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/ai-components.cjs"
+      }
+    },
+    "./script": "./dist/ai-components.iife.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.5",
+    "jsdom": "^29.1.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5",
+    "vitest": "^4.1.5"
+  },
+  "keywords": [
+    "web-components",
+    "custom-elements",
+    "ai",
+    "llm",
+    "natural-language",
+    "streaming",
+    "generative-ui",
+    "framework-agnostic"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicepkg/infinity"
+  },
+  "sideEffects": false
+}
