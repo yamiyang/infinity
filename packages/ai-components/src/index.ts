@@ -52,8 +52,12 @@ export function defineAll(): void {
 }
 
 // Auto-register when loaded via IIFE <script> tag
-if (typeof window !== "undefined" && typeof document !== "undefined") {
-  if (typeof (globalThis as Record<string, unknown>).AIC !== "undefined") {
-    defineAll();
-  }
+// 在非模块环境（即通过 <script> 标签直接引入 IIFE 包）时自动注册所有组件
+if (
+  typeof window !== "undefined" &&
+  typeof document !== "undefined" &&
+  typeof exports === "undefined" &&
+  typeof module === "undefined"
+) {
+  defineAll();
 }

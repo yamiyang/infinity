@@ -16,8 +16,17 @@ export interface LLMRequestOptions {
 
 /** Global configuration for ai-components */
 export interface AIComponentsConfig {
-  /** The LLM request function — must return an async iterable of string chunks */
-  request: LLMRequestFn;
+  /**
+   * Custom LLM request function — must return an async iterable of string chunks.
+   * 如果不提供，则使用内置的 OpenAI 兼容请求函数（需要配置 apiKey）。
+   */
+  request?: LLMRequestFn;
+  /** API Key — 配合内置请求函数使用（OpenAI 兼容格式） */
+  apiKey?: string;
+  /** API Base URL — 默认 https://api.deepseek.com */
+  baseUrl?: string;
+  /** 模型名称 — 默认 deepseek-chat */
+  model?: string;
   /** Optional custom system prompt override */
   systemPrompt?: string;
 }

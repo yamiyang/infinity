@@ -2,8 +2,9 @@
 // ai-components — LLM Stream Interface
 //
 // Calls the globally-provided LLM request function.
-// The host app sets `window.__ai_components.request` to provide
-// the actual LLM implementation.
+// Supports two modes:
+//   1. Simple: configure({ apiKey: 'sk-...' })  — uses built-in OpenAI-compatible streaming
+//   2. Custom: configure({ request: fn })       — bring your own request function
 // ============================================================
 
 import type { AIComponentsConfig, LLMRequestFn } from "./types";
@@ -11,11 +12,87 @@ import { SYSTEM_PROMPT, getDepthAwareSystemPrompt } from "./prompt";
 
 let _config: AIComponentsConfig | null = null;
 
+// ── Built-in OpenAI-compatible streaming request ────────────────
+
+/**
+ * 内置的 OpenAI 兼容流式请求函数。
+ * 当用户只配置 apiKey 时自动使用。
+ */
+function createBuiltinRequest(config: AIComponentsConfig): LLMRequestFn {
+  const baseUrl = (config.baseUrl || "https://api.deepseek.com").replace(/\/+$/, "");
+  const model = config.model || "deepseek-chat";
+  const apiKey = config.apiKey!;
+
+  return async function* builtinRequest(prompt, options) {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages: [
+          { role: "system", content: options?.systemPrompt || "" },
+          { role: "user", content: prompt },
+        ],
+      }),
+      signal: options?.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`[ai-components] API Error ${res.status}: ${err}`);
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") return;
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) yield content;
+        } catch { /* skip malformed chunks */ }
+      }
+    }
+  };
+}
+
+// ── Public API ──────────────────────────────────────────────────
+
 /**
  * Configure the global LLM request function.
  * Must be called before any <ai-component> is connected.
+ *
+ * @example
+ * // 极简配置 — 只需 API Key
+ * AIC.configure({ apiKey: 'sk-...' });
+ *
+ * // 自定义 baseUrl 和 model
+ * AIC.configure({ apiKey: 'sk-...', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' });
+ *
+ * // 完全自定义请求函数
+ * AIC.configure({ request: myCustomRequestFn });
  */
 export function configure(config: AIComponentsConfig): void {
+  // 如果用户没有提供 request 但提供了 apiKey，则使用内置请求函数
+  if (!config.request && config.apiKey) {
+    config.request = createBuiltinRequest(config);
+  }
   _config = config;
   // Also store on window for cross-module access
   if (typeof window !== "undefined") {
@@ -38,8 +115,8 @@ export function getRequestFn(): LLMRequestFn {
   const config = getConfig();
   if (!config?.request) {
     throw new Error(
-      "[ai-components] LLM request function not configured. " +
-      "Call configure({ request: fn }) or set window.__ai_components before using <ai-component>."
+      "[ai-components] LLM not configured. " +
+      "Call configure({ apiKey: 'sk-...' }) or configure({ request: fn }) before using AI components."
     );
   }
   return config.request;
